@@ -1,6 +1,8 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
+#include <tuple>
+#include <queue>
 #include <algorithm>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -12,25 +14,150 @@
 #include <unistd.h>
 
 void externalSort(int fdInput, uint64_t size, int fdOutput, uint64_t memSize) {
-    /// First run, do the sort of individual chuncks of size <= memSize
+    //First run, do the sort of individual chuncks of size == memSize
     uint64_t * buffer = (uint64_t *) malloc(memSize);
-    uint64_t readSize = read(fdInput, buffer, memSize);
-    uint64_t elementCount = readSize/sizeof(uint64_t);
-    std::sort(buffer, buffer + (elementCount-1)*sizeof(uint64_t));
+    uint64_t chunkNumber, chunkMemSize;
+    ssize_t readSize;
     int fd, ret;
-    if ((fd = open("__sort_chunk_1", O_CREAT|O_TRUNC|O_WRONLY, S_IRUSR|S_IWUSR)) < 0) {
-        std::cerr << "cannot open temporary file '__sort_chunk_1': " << strerror(errno) << std::endl;
+    chunkNumber = 0;
+    //this gives the maximum allowed read size to have only full uint64_t loaded (8 byte each)
+    chunkMemSize = memSize - (memSize % 8);
+    while ((readSize = read(fdInput, buffer, chunkMemSize)) > 0) {
+        //sort the read elements
+        std::sort(buffer, buffer + readSize/sizeof(uint64_t));
+        //get a file descriptor for the next temporary file
+        if ((fd = open(("__sort_chunk_" + std::to_string(chunkNumber)).c_str(), O_CREAT|O_TRUNC|O_WRONLY, S_IRUSR|S_IWUSR)) < 0) {
+            std::cerr << "externalSort: cannot open temporary file '__sort_chunk_" + std::to_string(chunkNumber) + "':" << strerror(errno) << std::endl;
+            return;
+        }
+        //get some disk space for this file
+        if ((ret = posix_fallocate(fd, 0, readSize)) != 0) {
+            std::cerr << "externalSort: cannot allocite disk space for temporary file '__sort_chunk_" + std::to_string(chunkNumber) + "':" << strerror(ret) << std::endl;
+            std::cerr << "externalSort: proceeding anyways, even thou this might be slow." << std::endl;
+        }
+        //write content to temporary file
+        if ((ret = write(fd, buffer, readSize)) != readSize) {
+            if (ret < 0) {
+                std::cerr << "externalSort: error writing to temporary file '__sort_chunk_" + std::to_string(chunkNumber) + "':" << strerror(errno) << std::endl;
+                if (close(fd) < 0) {
+                    std::cerr << "externalSort: cannot close temporary file '__sort_chunk_" + std::to_string(chunkNumber) + "':" << strerror(errno) << std::endl;
+                    return;
+                }
+            }
+            else {
+                std::cerr << "externalSort: write aborted prematurely after writing " << ret << " Bytes (of " << readSize << " Bytes to temporary file '__sort_chunk_" + std::to_string(chunkNumber) + "':" << std::endl;
+                return;
+            }
+        }
+        //close the temporary file
+        if (close(fd) < 0) {
+            std::cerr << "externalSort: cannot close temporary file '__sort_chunk_" + std::to_string(chunkNumber) + "':" << strerror(errno) << std::endl;
+            return;
+        }
+        //increment counter for chunkNumber
+        chunkNumber++;
+    }
+    //second run: now perform the merge sort of all the chunks
+    //we assume that the number of files is relatively small and thus the queue does not use to much memory
+    //i.e. this means we still can use the memory for the real buffers.
+    //within the queue each element represents: <current smallest element of this buffer>,<file descriptor>,<buffer begin>,<buffer pos>,<last read size>
+    struct compare  
+    {  
+        bool operator()(const std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t>& l, const std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t>& r)  
+        {  
+            return std::get<0>(l) > std::get<0>(r);  
+        }  
+    }; 
+
+    std::priority_queue<std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t >, std::vector<std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t>>, compare> filequeue;
+    uint64_t mergeMemSize = memSize / (chunkNumber + 1) - (memSize / (chunkNumber + 1)) % 8;
+    if (mergeMemSize < 8) {
+        std::cerr << "externalSort: resulting Buffer size per File of k-Way sort to small! Abortig merge sort!" << std::endl;
         return;
     }
-    if ((ret = posix_fallocate(fd, 0, elementCount*sizeof(uint64_t))) != 0)
-        std::cerr << "warning: could not allowate file space: " << strerror(ret) << std::endl;
-    if ((ret = write(fd, buffer, elementCount*sizeof(uint64_t))) != elementCount*sizeof(uint64_t)) {
-        if (ret < 0)
-            std::cerr << "cannot write temporary file: " << strerror(ret) << std::endl;
-        else
-            std::cerr << "less data written than expected: wrote " << ret << "/" << elementCount*sizeof(uint64_t) << " Bytes" << std::endl;
+    //reserve size on disk for output file
+    if ((ret = posix_fallocate(fdOutput, 0, size * 8)) != 0) {
+        std::cerr << "externalSort: cannot allocate disk space for output file: " << strerror(errno) << std::endl;
+        return;
     }
+    //open all the files and fill the priority_queue
+    for (uint64_t i = 0; i < chunkNumber; i++)
+    {
+        fd = open(("__sort_chunk_" + std::to_string(i)).c_str(), O_RDONLY);
+        uint64_t * bufferStart = buffer + i * mergeMemSize / 8;
+        readSize = read(fd, bufferStart, mergeMemSize)/8;
+        if (readSize > 0) {
+            filequeue.push(std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t>(bufferStart[0], fd, bufferStart, 0, readSize));
+        }
+    }
+    //initialize the write buffer (this is the position we write to, until we reach buffer + (chunkNumber + 1) * mergeMemSize which should mark the end
+    uint64_t * writeBuffer = buffer + chunkNumber * mergeMemSize / 8;
+    uint64_t * writeBufferEnd = buffer + (chunkNumber + 1) * mergeMemSize / 8;
 
+    //now we start to always pick one element out of the queue until we are done;
+    while (!filequeue.empty())
+    {
+        //get the next element
+        std::tuple<uint64_t, int, uint64_t *, ssize_t , ssize_t> current = filequeue.top();
+        filequeue.pop();
+        //write one value to writeBuffer
+        *writeBuffer++ = std::get<0>(current);
+        //update tuple
+        fd = std::get<1>(current);
+        uint64_t * bufferStart = std::get<2>(current);
+        ssize_t offset = std::get<3>(current);
+        readSize = std::get<4>(current);
+        offset++;
+        if (offset == readSize){
+            //in this case we need to load more data from disk
+            readSize = read(fd, bufferStart, mergeMemSize)/8;
+            if (readSize > 0) {
+                filequeue.push(std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t>(bufferStart[0], fd, bufferStart, 0, readSize));
+            }
+            else {
+                // close this fd (we are done with this one file!)
+                if (close(fd) < 0) {
+                    std::cerr << "externalSort: cannot close temporary file:" << strerror(errno) << std::endl;
+                    std::cerr << "externalSort: ignoring this even thou this might be dangerous" << std::endl;
+                }
+            }
+        }
+        else {
+            //in this case we do not have to load a new chunk of data, simply update the tuple
+            filequeue.push(std::tuple<uint64_t, int, uint64_t *, ssize_t, ssize_t>(bufferStart[offset], fd, bufferStart, offset, readSize));
+        }
+
+        // check if we need to write part of the data to disk
+        if (writeBuffer >= writeBufferEnd) {
+            //write content to temporary file, &buffer[chunkNumber * mergeMemSize /8] represents the start of the write buffer
+            if ((ret = write(fdOutput, &buffer[chunkNumber * mergeMemSize / 8], mergeMemSize)) != (ssize_t) mergeMemSize) {
+                if (ret < 0) {
+                    std::cerr << "externalSort: error writing to output file:" << strerror(errno) << std::endl;
+                    //TODO: cleanup before this return might be needed!
+                    return;
+                }
+                else {
+                    std::cerr << "externalSort: write aborted prematurely after writing " << ret << " Bytes (of " << mergeMemSize << " Bytes to output file)" << std::endl;
+                    //TODO: cleanup before this return might be needed!
+                    return;
+                }
+            }
+            //reset the buffer
+            writeBuffer = buffer + chunkNumber * mergeMemSize / 8;
+        }
+    }
+    //last write out all that is left in the write buffer
+    ssize_t remainderSize = (char *) writeBuffer - (char *) (buffer + chunkNumber * mergeMemSize / 8);
+    if ((ret = write(fdOutput, &buffer[chunkNumber * mergeMemSize / 8], remainderSize)) != remainderSize) { 
+        if (ret < 0) {
+            std::cerr << "externalSort: error writing to output file:" << strerror(errno) << std::endl;
+            return;
+        }
+        else {
+            std::cerr << "externalSort: write aborted prematurely after writing " << ret << " Bytes (of " << mergeMemSize << " Bytes to output file)" << std::endl;
+            return;
+        }
+    }
 }
 
 /// helper to cleanup fd and print error message if it failed 
@@ -97,7 +224,7 @@ int main(int argc, char* argv[]) {
         //----------------
         //PERFORM TEST RUN
         //----------------
-        //externalSort(fdInput, size, fdOutput, memSize);
+        externalSort(fdInput, size, fdOutput, memSize);
 
         //cleanup (close file descriptors)
         cleanupFd(fdInput);
@@ -107,6 +234,7 @@ int main(int argc, char* argv[]) {
         //CHECK SUCCESS OF TEST RUN
         //-------------------------
         int fdResult;
+        int failCount = 0;
 
         //open result file
         if ((fdResult = open(argv[2], O_RDONLY)) < 0) {
@@ -123,6 +251,10 @@ int main(int argc, char* argv[]) {
 
         if (size != (uint64_t) (st.st_size /8)) {
             std::cout << "Size of result Elements (" << st.st_size / 8 << ") does not match original size(" << size << ")! Testing order anyways." << std::endl;
+            failCount ++;
+        }
+        else {
+            std::cout << "Size test done" << std::endl;
         }
 
         //next test: check if elements are in ascending order
@@ -134,11 +266,13 @@ int main(int argc, char* argv[]) {
             for (int i = 0; i < (ret/8); i++) {
                 //first element of current buffer
                 if (i == 0 && buffer[i] < leftover) {
-                    std::cout << "Error in result found: " << buffer[i] << " is following " << leftover << ", but it is smaller!" << std::endl;
+                    std::cout << "Error in result found: " << buffer[i] << " is following " << leftover << ", but it is smaller!LEFTOVER!!!!" << std::endl;
+                    failCount++;
                 }
                 else {
                     if (buffer[i] < buffer[i-1]) {
-                        std::cout << "Error in result found: " << buffer[i] << " is following " << buffer[i-1] << ", but it is smaller!" << std::endl;
+                        std::cout << "Error in result found: " << buffer[i] << " is following " << buffer[i-1] << ", but it is smaller!MIDDLE!!!!" << i << std::endl;
+                        failCount++;
                     }
                     if (i == (ret/8 - 1)) {
                         leftover = buffer[i];
@@ -146,9 +280,12 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-
+        std::cout << "Order test done" << std::endl;
+        std::cout << "Total number of failures found: " << failCount << std::endl;
+        cleanupFd(fdResult);
         free(buffer);
-
+        if (failCount)
+            return -1;
     }
     return 0;
 }

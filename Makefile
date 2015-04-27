@@ -1,8 +1,17 @@
-gen: gen.cpp Makefile
-	g++ -g -O2 -Werror gen.cpp -o gen
+include Makefile.in
 
-sort: sort.cpp Makefile
-	g++ -g -O2 -Wall -std=c++11 sort.cpp -o sort
+DIRS	= external-sort buffer
+
+all: external-sort
+
+external-sort: force_look
+	cd external-sort; $(MAKE) $(MFLAGS)
+
+buffer: force_look
+	cd buffer; $(MAKE) $(MFLAGS)
 
 clean:
-	rm -rf gen
+	for d in $(DIRS); do (cd $$d; $(MAKE) clean); done
+	
+force_look:
+	true

@@ -11,7 +11,7 @@ public:
 private:
 
     void * data;
-    uint64_t pageId, LSN;
+    uint64_t pageId;
     bool isDirty;
 };
 

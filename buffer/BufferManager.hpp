@@ -13,7 +13,8 @@ public:
 
 private:
     uint64_t pageCount;
-    std::unordered_map<uint64_t, BufferFrame*> pages;
+    std::unordered_map<uint64_t, BufferFrame > pages;
+    std::unordered_map<std::string, int> files;
 };
 
 

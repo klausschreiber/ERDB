@@ -1,7 +1,7 @@
 CXX	= g++
-CFLAGS	= -c -Wall -std=c++11 -g
+CFLAGS	= -pthread -c -Wall -std=c++11 -g
 LD	= g++
-LDFLAGS	= -lpthread
+LDFLAGS	= -pthread
 RM	= rm
 ECHO	= echo
 

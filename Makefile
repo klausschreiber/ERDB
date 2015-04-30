@@ -1,6 +1,6 @@
 include Makefile.in
 
-DIRS	= external-sort buffer
+DIRS	= external-sort buffer testing
 
 all: external-sort buffer-test testing
 

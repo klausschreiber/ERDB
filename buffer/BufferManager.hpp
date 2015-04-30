@@ -2,6 +2,7 @@
 #include "BufferFrame.hpp"
 #include <stdint.h>
 #include <unordered_map>
+#include <pthread.h>
 
 class BufferManager {
 
@@ -13,8 +14,13 @@ public:
 
 private:
     uint64_t pageCount;
+
+    pthread_mutex_t files_lock;
+    pthread_mutex_t pages_lock;
+
     std::unordered_map<uint64_t, BufferFrame *> pages;
     std::unordered_map<std::string, int> files;
+    
 };
 
 

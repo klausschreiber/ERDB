@@ -1,4 +1,5 @@
 #ifndef BUFFER_FRAME_HPP
+#define BUFFER_FRAME_HPP
 #include <stdint.h>
 #include <pthread.h>
 
@@ -24,5 +25,4 @@ private:
 };
 
 
-#define BUFFER_FRAME_HPP
 #endif

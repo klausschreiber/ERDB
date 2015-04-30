@@ -1,7 +1,9 @@
 #ifndef BUFFER_MANAGER_HPP
+#define BUFFER_MANAGER_HPP
 #include "BufferFrame.hpp"
 #include <stdint.h>
 #include <unordered_map>
+#include <list>
 #include <pthread.h>
 
 class BufferManager {
@@ -17,12 +19,12 @@ private:
 
     pthread_mutex_t files_lock;
     pthread_mutex_t pages_lock;
+    pthread_mutex_t evict_lock;
 
     std::unordered_map<uint64_t, BufferFrame *> pages;
     std::unordered_map<std::string, int> files;
-    
+    std::list<uint64_t> evict_list;
 };
 
 
-#define BUFFER_MANAGER_HPP
 #endif

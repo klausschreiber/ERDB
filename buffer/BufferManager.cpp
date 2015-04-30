@@ -28,12 +28,9 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
     
     std::cout << "Pages.size(): " << pages.size() << std::endl;
     
-    uint64_t segment = pageId >> ( 64 - 16 );
-    uint64_t page = pageId & (( (uint64_t) 1 << 48 ) - 1 );
-    
     //Test if we got the frame in the buffer
-    BufferFrame frame;
-    std::unordered_map<uint64_t, BufferFrame>::const_iterator got = pages.find(pageId);
+    BufferFrame * frame;
+    std::unordered_map<uint64_t, BufferFrame *>::const_iterator got = pages.find(pageId);
     if (got == pages.end()) {
 //        //Get pid and sid from pageId
 //        const struct Pid * pid = reinterpret_cast<const struct Pid *>(&pageId);
@@ -58,10 +55,10 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
 //            fd = files_it->second;
 //        }
 //
-        //frame = new BufferFrame();
-        frame.data = malloc(pageSize);
-        frame.pageId = pageId;
-        frame.isDirty = false;
+        frame = new BufferFrame();
+        frame->data = malloc(pageSize);
+        frame->pageId = pageId;
+        frame->isDirty = false;
 //
 //        //read the data from the file
 //        ssize_t rsize = pread(fd, frame->data, pageSize*(pid->pid), pageSize);
@@ -75,7 +72,7 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
 //            //memset(frame->data, '\0', pageSize);
 //        }
 //
-        std::pair<uint64_t, BufferFrame> element(pageId, frame);
+        std::pair<uint64_t, BufferFrame*> element(pageId, frame);
         pages.insert(element);
         std::cout << "fixPage of page: " << pageId << " (empty page used. Load not implemented!)" << std::endl;
     }
@@ -83,7 +80,7 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         frame = got->second;
         std::cout << "fixPage of page: " << pageId << " (Page loaded from map)" << std::endl;
     }
-    return frame;
+    return *frame;
 }
 
 void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {

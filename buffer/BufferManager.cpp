@@ -44,7 +44,7 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
  
     //Test if we got the frame in the buffer
     BufferFrame * frame;
-
+        
     //lock the pages
     if (pthread_mutex_lock(&pages_lock) != 0) {
         std::cout << "error while locking pages table. Aborting!" << std::endl;
@@ -52,6 +52,18 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
     }
     std::unordered_map<uint64_t, BufferFrame *>::const_iterator pages_it = pages.find(pageId);
     if (pages_it == pages.end()) {
+        //The page was not within the buffered pages.
+        //Step 1 : create it
+        //Step 2 : write lock it
+        //Step 3 : add it to pages
+        //Step 4 : unlock pages (hash-map)
+        //Step 5 : really load page
+        //Step 6 : add page to evict_list
+        //Step 7 : unlock page (so it can be locked as desired by caller)
+
+        
+
+
         //Get pid and sid from pageId
         const struct Pid * pid = reinterpret_cast<const struct Pid *>(&pageId);
         //calculate the file name
@@ -65,7 +77,7 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
             //it was not opened before, so open it
             fd = open(fname.c_str(), O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
             if (fd < 0) {
-                perror("Could not open file within fixPage!");
+                perror("Could not open file within fixPage. Aborting!");
                 exit(1);
             }
             files.insert(std::pair<std::string, int> (fname, fd));
@@ -78,9 +90,9 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         frame = new BufferFrame(pageId);
 
         //read the data from the file
-        ssize_t rsize = pread(fd, frame->data, pageSize*(pid->pid), pageSize);
+        ssize_t rsize = pread(fd, frame->data, pageSize, pageSize*(pid->pid));
         if (rsize < 0) {
-            perror ("Could not read from file within fixPage!");
+            perror ("Could not read from file within fixPage. Aborting!");
             exit(1);
         }
         else if (rsize != pageSize) {
@@ -90,21 +102,9 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
             frame->isDirty = true;
         }
         
-        std::cout << "pages" ;
-        for ( std::unordered_map<uint64_t, BufferFrame*>::iterator it = pages.begin(); it != pages.end(); it++) {
-            std::cout << " : " << it->first << " - " << it->second->pageId;
-        }
-        std::cout << std::endl;
-
-        std::cout << "evict_list" ;
-        for ( std::list<uint64_t>::iterator it = evict_list.begin(); it != evict_list.end(); it++) {
-            std::cout << " : " << *it;
-        }
-        std::cout << std::endl;
         //check if we have free space within our buffer
         if (pages.size() >= pageCount)
         {
-//            std::cout << "evicting... buffer size is:" << pages.size() << std::endl;
             //we need to evict a page!
             //LOCK(evict_lock)
             if (pthread_mutex_lock(&evict_lock) != 0) {
@@ -113,24 +113,21 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
             }
             bool evict_success = false;
             for (std::list<uint64_t>::iterator it = evict_list.begin(); it != evict_list.end(); it++) { 
-                std::cout << "trying to evict pageId: " << *it << std::endl;
                 std::unordered_map<uint64_t, BufferFrame *>::const_iterator elem = pages.find(*it);
                 if (elem != pages.end()) {
                     BufferFrame * candidate = elem->second;
                     if (candidate->pageId != *it) {
                         std::cout << "pageId does not match! looked for: " << *it << " but got: " << candidate->pageId << std::endl;
                     }
-//                    std::cout << "found candidate for pageId: " << *it << std::endl;
                     //check if it is currently unused;
                     if(pthread_rwlock_trywrlock(&(candidate->rwlock)) == 0) {
                         //this means we got the lock :-) -> we can evict this page
-//                        std::cout << "candidate could be locked :-)" << std::endl;
                         pages.erase(elem);
                         evict_list.erase(it);
                     
                         //UNLOCK(evict_lock) success case
                         if (pthread_mutex_unlock(&evict_lock) != 0) {
-//                            std::cout << "error while unlocking evict list. Aborting!" << std::endl;
+                            std::cout << "error while unlocking evict list. Aborting!" << std::endl;
                             exit(1);
                         }
                         //we removed it from both lists, now we need to store it in case it is dirty
@@ -172,8 +169,11 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
                                 std::cout << "could not write all data to file. Aborting!" << std::endl;
                                 exit(1);
                             }
-                            std::cout << "successfully wrote back dirty page. Write size was: " << 0 << ", pageSize is: " << pageSize << std::endl;
+                            std::cout << "successfully wrote back dirty page (" << candidate->pageId << "). Write size was: " << wsize << ", pageSize is: " << pageSize << std::endl;
                             //at this point the write was successfull
+                        }
+                        else {
+                            //Page was not dirty, so we can simply delete it
                         }
                         //unlock and delete the page
                         if(pthread_rwlock_unlock(&(candidate->rwlock)) != 0) {
@@ -181,14 +181,13 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
                             std::cout << "unlock of page failed! Aborting!" << std::endl;
                             exit(1);
                         }
-                        std::cout << "successfully evicted pageId: " << candidate->pageId << " original pageId: " << *it << std::endl;
                         delete candidate;
                         //we found one element and successfully deleted it, stop evicting now
                         evict_success = true;
                         break;
                     }
                     else {
-                        //do nothing here, as the page was locked. continue with next page
+                        //do nothing here, as the page was locked. try evicting next page
                         continue;
                     }
                 }
@@ -206,12 +205,10 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
 
         }
         //enough space should be free now, add the element to the pages map
-        std::cout << "adding data to pages: pageId: " << pageId << " frame->pageId: " << frame->pageId << std::endl;
         std::pair<uint64_t, BufferFrame*> element(pageId, frame);
         pages.insert(element);
         
         //add element to evict_list
-
         //LOCK(evict_lock)
         if (pthread_mutex_lock(&evict_lock) != 0) {
             std::cout << "error while locking evict list. Aborting!" << std::endl;
@@ -225,8 +222,14 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         }
     }
     else {
+        //The page was found within our buffer. This is the best case.
         cached = true;
         frame = pages_it->second;
+    }
+    //UNLOCK(pages_lock)
+    if (pthread_mutex_unlock(&pages_lock) != 0) {
+        std::cout << "error while unlocking pages table. Aborting!" << std::endl;
+        exit(1);
     }
     int res;
     if (exclusive) {
@@ -239,11 +242,6 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
     }
     if (res != 0) {
         std::cout << "could not lock rwlock! Aborting!" << std::endl;
-        exit(1);
-    }
-    //unlock the pages
-    if (pthread_mutex_unlock(&pages_lock) != 0) {
-        std::cout << "error while unlocking pages table. Aborting!" << std::endl;
         exit(1);
     }
     std::cout << "FIX: " << pageId << " exclusive: " << exclusive << " cached: " << cached << " exists: " << exists << std::endl;
@@ -262,7 +260,7 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
         std::cout << "could not unlock rwlock! Aborting!" << std::endl;
         exit(1);
     }
-    std::cout << "UNFIX: " << frame.pageId << " isDirty was: " << isDirty << std::endl;
+//    std::cout << "UNFIX: " << frame.pageId << " isDirty was: " << isDirty << std::endl;
     return;
 }
 

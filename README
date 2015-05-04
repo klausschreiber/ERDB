@@ -1,1 +1,5 @@
-TODO
+Zum erstellen des Projekts genügt `make`.
+Nach dem Abändern ist `make clean && make` nötig, da die Abhängigkeiten im Makefile noch nicht korrekt sind.
+
+Dadurch wird buffer-test als ausführbare Datei ins Stammverzeichnis erzeugt.
+

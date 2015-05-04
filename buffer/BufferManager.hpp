@@ -40,6 +40,7 @@ private:
     //list for evict order (currently used as fifo
     std::list<uint64_t> evict_list;
 
+    pthread_mutex_t output_lock;
 };
 
 

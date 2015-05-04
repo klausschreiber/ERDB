@@ -72,9 +72,9 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         //Step 5 : if we need to evict an element, select one and remove it from pages map
         //Step 6 : unlock pages (hash-map)
         //Step 7 : evict selected element if needed (store to disk. free space)
-        //Step 5 : really load page from disk
-        //Step 6 : add page to evict_list
-        //Step 7 : unlock page (so it can be locked as desired by caller)
+        //Step 8 : really load page from disk
+        //Step 9 : unlock page and relock as desired (read or write)
+        //Step 10 : add page to evict_list
         
         //Step 1 : create Page 
         frame = new BufferFrame(pageId);
@@ -241,12 +241,15 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
                 std::cout << "unlock of page failed! Aborting!" << std::endl;
                 exit(1);
             }
+#ifdef PRINT_BASIC                
+            pthread_mutex_lock(&output_lock);
+            std::cout << "evicting and deleting page " << evict->pageId << std::endl;
+            pthread_mutex_unlock(&output_lock);
+#endif
             delete evict;
-            //just to be safe :-)
-            evict = NULL;
         }
         
-        //Step 5 : really load page from disk
+        //Step 8 : really load page from disk
         //Get pid and sid from pageId
         const struct Pid * pid = reinterpret_cast<const struct Pid *>(&pageId);
         //calculate the file name
@@ -304,7 +307,32 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
             frame->isDirty = true;
         }
         
-        //Step 6 : add page to evict_list 
+        
+        //Step 9 : unlock page and lock with rdlock if needed. This does not have to be checked for the frame beeing still valid (not evicted) as it is not even in the evict list.
+        if (!exclusive) {
+#ifdef PRINT_LOCK
+            pthread_mutex_lock(&output_lock);
+            std::cout << "FIX: UNLOCKING(frame->rwlock): " << &(frame->rwlock) << std::endl;
+            pthread_mutex_unlock(&output_lock);
+#endif
+            if(pthread_rwlock_unlock(&(frame->rwlock)) != 0) {
+                // if this happens we could not unlock this page again, which is bad!
+                std::cout << "unlock of page failed! Aborting!" << std::endl;
+                exit(1);
+            }
+#ifdef PRINT_LOCK
+            pthread_mutex_lock(&output_lock);
+            std::cout << "FIX: LOCKING(frame->rwlock): " << &(frame->rwlock) << std::endl;
+            pthread_mutex_unlock(&output_lock);
+#endif
+            int res = pthread_rwlock_rdlock(&(frame->rwlock));
+            if (res != 0) {
+                std::cout << "could not lock rwlock! Aborting! Error was: " << res << " as string: " << strerror(res) << " exclusive was: " << exclusive << std::endl;
+                exit(1);
+            }
+        }
+       
+         //Step 10 : add page to evict_list 
 #ifdef PRINT_LOCK
         pthread_mutex_lock(&output_lock);
         std::cout << "FIX: LOCKING(evict_lock): " << &evict_lock << std::endl;
@@ -326,24 +354,31 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
             std::cout << "error while unlocking evict list. Aborting!" << std::endl;
             exit(1);
         }
-        
-        //Step 7 : unlock page (so it can be locked as desired by caller)
-#ifdef PRINT_LOCK
-        pthread_mutex_lock(&output_lock);
-        std::cout << "FIX: UNLOCKING(frame->rwlock): " << &files_lock << std::endl;
-        pthread_mutex_unlock(&output_lock);
-#endif
-        if(pthread_rwlock_unlock(&(frame->rwlock)) != 0) {
-            // if this happens we could not unlock this page again, which is bad!
-            std::cout << "unlock of page failed! Aborting!" << std::endl;
-            exit(1);
-        }
     }
     else {
         //The page was found within our buffer. This is the best case.
+        //TODO: is there a way to unlock the pages_lock before locking the frame without risking someone taking away the page (evicting it?)
         cached = true;
         frame = pages_it->second;
         //UNLOCK(pages_lock)
+#ifdef PRINT_LOCK
+        pthread_mutex_lock(&output_lock);
+        std::cout << "FIX: LOCKING(frame->rwlock): " << &(frame->rwlock) << std::endl;
+        pthread_mutex_unlock(&output_lock);
+#endif
+        int res;
+        if (exclusive) {
+            //exclusive = wr-lock
+            res = pthread_rwlock_wrlock(&(frame->rwlock));
+        }
+        else {
+            //read only access
+            res = pthread_rwlock_rdlock(&(frame->rwlock));
+        }
+        if (res != 0) {
+            std::cout << "could not lock rwlock! Aborting! Error was: " << res << " as string: " << strerror(res) << " exclusive was: " << exclusive << std::endl;
+            exit(1);
+        }
 #ifdef PRINT_LOCK
         pthread_mutex_lock(&output_lock);
         std::cout << "FIX: UNLOCKING(pages_lock): " << &pages_lock << std::endl;
@@ -353,29 +388,6 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
             std::cout << "error while unlocking pages table. Aborting!" << std::endl;
             exit(1);
         }
-    }
-    int res;
-    if (exclusive) {
-        //exclusive lock
-#ifdef PRINT_LOCK
-        pthread_mutex_lock(&output_lock);
-        std::cout << "FIX: LOCKING(frame->rwlock): " << &(frame->rwlock) << std::endl;
-        pthread_mutex_unlock(&output_lock);
-#endif
-        res = pthread_rwlock_wrlock(&(frame->rwlock));
-    }
-    else {
-        //non exclusive lock
-#ifdef PRINT_LOCK
-        pthread_mutex_lock(&output_lock);
-        std::cout << "FIX: LOCKING(frame->rwlock): " << &(frame->rwlock) << std::endl;
-        pthread_mutex_unlock(&output_lock);
-#endif
-        res = pthread_rwlock_rdlock(&(frame->rwlock));
-    }
-    if (res != 0) {
-        std::cout << "could not lock rwlock! Aborting! Error was: " << res << " as string: " << strerror(res) << " exclusive was: " << exclusive << std::endl;
-        exit(1);
     }
 #ifdef PRINT_BASIC
     pthread_mutex_lock(&output_lock);

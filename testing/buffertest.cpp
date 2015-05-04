@@ -32,14 +32,11 @@ static void* scan(void *arg) {
    while (!stop) {
       unsigned start = random()%(pagesOnDisk-10);
       for (unsigned page=start; page<start+10; page++) {
-         std::cout << "scan: fixing " << page << std::endl;
          BufferFrame& bf = bm->fixPage(page, false);
          unsigned newcount = reinterpret_cast<unsigned*>(bf.getData())[0];
          assert(counters[page]<=newcount);
          counters[page]=newcount;
-         std::cout << "scan: unfixing " << page << std::endl;
          bm->unfixPage(bf, false);
-         if(stop) break;
       }
    }
 
@@ -53,14 +50,12 @@ static void* readWrite(void *arg) {
    uintptr_t count = 0;
    for (unsigned i=0; i<100000/threadCount; i++) {
       bool isWrite = rand_r(&threadSeed[threadNum])%128<10;
-      std::cout << "readwrite: fixing..." << std::endl;
       BufferFrame& bf = bm->fixPage(randomPage(threadNum), isWrite);
 
       if (isWrite) {
          count++;
          reinterpret_cast<unsigned*>(bf.getData())[0]++;
       }
-      std::cout << "readwrite: unfixing..." << std::endl;
       bm->unfixPage(bf, isWrite);
    }
 
@@ -110,16 +105,9 @@ int main(int argc, char** argv) {
       totalCount+=reinterpret_cast<uintptr_t>(ret);
    }
 
-   cout << "all read write threads joined" << endl;
-
    // wait for scan thread
    stop=true;
- 
-   cout << "stop set: " << stop << endl;
-
    pthread_join(scanThread, NULL);
-
-   cout << "scan thread joined" << endl;
 
    // restart buffer manager
    delete bm;

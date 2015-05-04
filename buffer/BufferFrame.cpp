@@ -18,6 +18,11 @@ BufferFrame::BufferFrame(uint64_t pageId) {
         std::cout << "could not initiate rwlock! Aborting!" << std::endl;
         exit(1);
     }
+    res = pthread_rwlock_init(&latch, NULL);
+    if (res != 0) {
+        std::cout << "could not initiate latch! Aborting!" << std::endl;
+        exit(1);
+    }
 }
 
 BufferFrame::~BufferFrame() {
@@ -26,6 +31,11 @@ BufferFrame::~BufferFrame() {
     int res = pthread_rwlock_destroy(&rwlock);
     if (res != 0) {
         std::cout << "could not destroy rwlock! Aborting!" << std::endl;
+        exit(1);
+    }
+    res = pthread_rwlock_destroy(&latch);
+    if (res != 0) {
+        std::cout << "could not destroy latch! Aborting!" << std::endl;
         exit(1);
     }
 }

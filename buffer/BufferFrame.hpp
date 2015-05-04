@@ -22,6 +22,7 @@ private:
     uint64_t pageId;
     bool isDirty;
     pthread_rwlock_t rwlock;
+    pthread_rwlock_t latch;
 };
 
 

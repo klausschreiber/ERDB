@@ -1,5 +1,51 @@
 Zum erstellen des Projekts genügt `make`.
 Nach dem Abändern ist `make clean && make` nötig, da die Abhängigkeiten im Makefile noch nicht korrekt sind.
 
-Dadurch wird buffer-test als ausführbare Datei ins Stammverzeichnis erzeugt.
+Files + beschreibung:
+
+buffer/BufferManager.hpp
+buffer/BufferManager.cpp:
+    Der Buffer Manager. In dieser Klasse werden die fixPage und unfixPage Funktionen wie gefordert implementiert.
+    Ist eine Ausgabe von Debug-Informationen zur laufzeit auf der Kommandozeile gewünscht, so muss PRINT_LOCK bzw. PRINT_BASIC
+    gesetzt werden. Diese geben die Information aus, und vordern dazu pro Ausgabezeile ein mutex an, um zu verhindern, dass
+    die Ausgabe bei paralleler Ausführung durchmischt wird bzw. Es zu Zugriffsfehler auf std::out kommt (was eigentlich ohnehin
+    nicht passieren sollte!)
+
+    unfixPage gibt lediglich das Lock zurück und setzt ggf. das dirty Flag.
+    
+    fixPage gibt zu einer gegebene pageId die entsprechend (exclusive?) gesperrte Seite zurück. Einige Fälle:
+        - Seite nicht geladen, noch nicht der gesamte RAM-Buffer verbraucht: Die Seite wird geladen und zurückgegeben
+        - Seite nicht geladen, der gesamte RAM-Buffer verbraucht: Wenn möglich wird eine Seite evicted und dabei (wenn nötig) zurück auf die Festplatte geschrieben
+                Anschließend wird die Seitel geladen und entsprechend gesperrt zurückgegeben.
+        - Seite bereits geladen, nicht gesperrt: Die Seite wird entsprechend gesperrt zurückgegeben
+        - Seite bereits geladen, gesperrt (read): Wird die Seite zum lesen angefordert (exclusive=false) so wird sie zurückgegeben (mehrere Leser möglich)
+                Andernfalls wird gewartet, bis die Seite zum schreiben zur verfügung steht.
+        - Seite beraits geladen, gesperrt (write): Es wird gewartet, bis die Seite frei (enstperrt) ist, dann wird sie entsprechend neu gesperrt und zurück gegeben
+
+        - Im Falle eines Fehlers wird das Programm beendet (fail-stop). Dazu zählt:
+            - Es tritt ein Fehler beim sperren/freigeben eines locks auf
+            - Es tritt ein Fehler mit I/O auf
+            - Es kann keine Seite evicted werden, obwohl dies nötig ist
+
+    Diese Auflistung ist möglicherweise nicht vollständig, sondern stellt nur eine grobe Beschreibung der Funktion dar.
+buffer/BufferFrame.hpp
+buffer/BufferFrame.cpp
+    Implementierung des BufferFrames. Von außen her sollte nur getData verwendet werden, um einen void Pointer zu erhalten. Dieser zeigt auf das zugehörige Datenfeld.
+    Als größe des Datenfeldes ist jene in constants.hpp angegeben Größe zu verwenden.
+buffer/constants.hpp
+    Definitien der Konstanten (pageSize)
+buffer/Makefile
+    Makefile der buffer-Verwaltung
+
+testing/buffertest.cpp
+    Test case wie auf der Lehrstuhlseite gegeben
+testing/Makefile
+    Makeflie der testing Files
+
+Makefile
+    globales Makefile. Zum Erzeugen des Projekts verwenden mittels: make clean && make
+    Die Ausgabedatei lautet buffer-test und liegt im Wurzelverzeichnis
+
+Alle anderen Dateien:
+    Dateien zur vorherigen Aufgabe + zugehörige Makefiles
 

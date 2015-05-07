@@ -1,5 +1,6 @@
 CXX	= g++
 CFLAGS	= -pthread -c -Wall -std=c++11 -g
+CXXFLAGS = $(CFLAGS)
 LD	= g++
 LDFLAGS	= -pthread
 RM	= rm

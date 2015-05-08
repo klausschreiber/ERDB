@@ -13,8 +13,8 @@ Parser.o: Parser.cpp Parser.hpp Makefile
 %.o: %.cpp %.hpp
 	$(CXX) -c $(CFLAGS) -o $@ $<
 
-parser: Schema.o Parser.o Schema.hpp Types.hpp parser.cpp Makefile
-	$(CXX) $(CXXFLAGS) Parser.o Schema.o parser.cpp -o parser
+parser: Schema.o Parser.o Schema.hpp Types.hpp parser-test.cpp Makefile
+	$(CXX) $(CXXFLAGS) Parser.o Schema.o parser-test.cpp -o parser-test
 
 clean:
-	$(RM) -rf $(OBJS) parser
+	$(RM) -rf $(OBJS) parser-test

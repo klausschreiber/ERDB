@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string>
 #include <iostream>
+#include <list>
 
 #include "../buffer/BufferManager.hpp"
 
@@ -23,12 +24,18 @@ public:
 
     //fix a Schema to read / write it or its data. A schema has to be returned.
     //Only one process can write a Schema at a time, multiple readers possible.
-    Schema& fixSchema(std::string name, const bool exclusive);
+    Schema* fixSchema(std::string name, const bool exclusive);
 
     //return a schema. This is important as it gives a possible writer the
     //oportunity to perform its action (and if you are the writer it gives the
     //others the oportunity to use the schema)
     void unfixSchema(Schema& schema, const bool isDirty);
+
+    Schema& newSchema(std::string name);
+
+    int dropSchema(std::string name);
+
+    const std::list<std::string> listTables();
 
     //Constructor. Needs to be called with a valid BufferManager.
     SchemaManager( BufferManager &bufferManager) : bufferManager(bufferManager)

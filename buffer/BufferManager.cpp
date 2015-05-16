@@ -541,7 +541,7 @@ BufferManager::~BufferManager() {
             std::cout <<  "Destructor: writing page " << current->pageId << " to disk. "  << wsize << " Bytes written" << std::endl;
         }
         //Now as it was written to disk if needed we can securely delete it
-        delete current;
+        //delete current;
     }
     //close file descriptors
     for (auto it = files.begin(); it != files.end(); it++) {

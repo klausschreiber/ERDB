@@ -1,6 +1,6 @@
 include ../Makefile.in
 
-OBJS = Schema.o Parser.o SchemaManager.o
+OBJS = Schema.o SchemaManager.o
 
 all: $(OBJS)
 

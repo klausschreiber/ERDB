@@ -27,7 +27,7 @@ BufferFrame::BufferFrame(uint64_t pageId) {
 
 BufferFrame::~BufferFrame() {
     //cast to char* to avoid warning!
-    delete((char*) data);
+    free((char*) data);
     int res = pthread_rwlock_destroy(&rwlock);
     if (res != 0) {
         std::cout << "could not destroy rwlock! Aborting!" << std::endl;

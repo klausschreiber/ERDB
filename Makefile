@@ -20,7 +20,7 @@ schema: force_look
 	$(MAKE) $(MFLAGS) -C schema
 
 schema-test: schema buffer
-	$(LD) $(LDFLAGS) -o schema-test ./buffer/BufferManager.o ./buffer/BufferFrame.o ./schema/SchemaManager.o
+	$(LD) $(LDFLAGS) -o schema-test ./buffer/BufferManager.o ./buffer/BufferFrame.o ./schema/SchemaManager.o ./schema/Schema.o
 	
 
 clean:

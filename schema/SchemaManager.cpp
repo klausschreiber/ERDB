@@ -4,7 +4,7 @@
 #include <utility>
 #include <iostream>
 
-const struct Schema* const SchemaManager::getSchema(std::string name) {
+const struct Schema* const SchemaManager::getSchema(const std::string name) {
     auto result = schema_map.find(name);
     if (result != schema_map.end()) {
         //we found it
@@ -30,6 +30,8 @@ int SchemaManager::addSchema(Schema& schema) {
         //set the segment id to use for this schema
         schema.segment = next_segment;
         next_segment++;
+        //set the schemas page_count to 0;
+        schema.page_count = 0;
         //get the next (empty) page
         BufferFrame& frame = bufferManager.fixPage(next_page, true);
         //copy the schema to the new page
@@ -65,7 +67,31 @@ int SchemaManager::addSchema(Schema& schema) {
     }
 }
 
-int SchemaManager::dropSchema(std::string name) {
+int SchemaManager::incrementPagesCount(const std::string name) {
+    auto result = schema_map.find(name);
+    if (result != schema_map.end()) {
+        auto page_res = schema_page_map.find(name);
+        if(page_res == schema_page_map.end()) {
+            std::cerr << "incrempntPagesCount: This should not happen!"
+                << std::endl;
+            exit(1);
+        }
+        //change it on disk
+        BufferFrame& frame = bufferManager.fixPage(page_res->second, true);
+        struct SchemaFrame* schemaFrame =
+            reinterpret_cast<struct SchemaFrame*>(frame.getData());
+        schemaFrame->schema.page_count++;
+        bufferManager.unfixPage(frame, true);
+        //change it in memory
+        result->second->page_count++;
+        return 0;
+    }
+    else {
+        return -1;
+    }
+}
+
+int SchemaManager::dropSchema(const std::string name) {
     auto result = schema_map.find(name);
     if (result != schema_map.end()) {
         //we found it
@@ -74,8 +100,7 @@ int SchemaManager::dropSchema(std::string name) {
             std::cerr << "dropSchema: This should not happen!" << std::endl;
             exit(1);
         }
-        BufferFrame& frame = bufferManager.fixPage(
-                page_res->second, true);
+        BufferFrame& frame = bufferManager.fixPage(page_res->second, true);
         struct SchemaFrame* schemaFrame =
             reinterpret_cast<struct SchemaFrame*>(frame.getData());
         schemaFrame->header.valid = 0;

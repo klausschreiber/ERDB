@@ -11,6 +11,7 @@ struct Schema {
         Type type; //column type
         bool notNull; //is null allowed (ignored for now)
     };
+    uint64_t page_count;
     uint16_t segment; //segment id
     uint16_t attr_count; //number of attributes
     uint16_t primary_key_index[5]; //index of primary key elements. This is assumed to be valid if it is within the valid attributes.

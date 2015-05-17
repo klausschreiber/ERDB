@@ -10,15 +10,17 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include "PID.hpp"
+
 
 //#define PRINT_LOCK
 #define PRINT_BASIC
 
 //Definition of segment-id and page-id within pageId (externally given)
-struct Pid {
-    uint16_t pid:16;
-    uint64_t sid:48;
-};
+//struct Pid {
+//    uint16_t pid:16;
+//    uint64_t sid:48;
+//};
 
 BufferManager::BufferManager( const unsigned int pageCount ) {
     this->pageCount = pageCount;
@@ -197,7 +199,7 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
                 //If it is dirty we need to write it to disk
 
                 //Get pid and sid from pageId
-                const struct Pid * evict_pid = reinterpret_cast<const struct Pid *>(&(evict->pageId));
+                const struct PID * evict_pid = reinterpret_cast<const struct PID *>(&(evict->pageId));
                 //calculate the file name
                 std::stringstream evict_sstm;
                 evict_sstm << evict_pid->sid;
@@ -283,7 +285,7 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         
         //Step 8 : really load page from disk
         //Get pid and sid from pageId
-        const struct Pid * pid = reinterpret_cast<const struct Pid *>(&pageId);
+        const struct PID * pid = reinterpret_cast<const struct PID *>(&pageId);
         //calculate the file name
         std::stringstream sstm;
         sstm << pid->sid;
@@ -473,7 +475,8 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
     //frame that can be returned and used savely elsewhere
 #ifdef PRINT_BASIC
     pthread_mutex_lock(&output_lock);
-    std::cout << "FIX: " << pageId << " exclusive: " << exclusive << " cached: " << cached << " exists: " << exists << std::endl;
+    const struct PID * pid_output = reinterpret_cast<const struct PID *>(&pageId);
+    std::cout << "FIX: " << pid_output->sid << ":" <<pid_output->pid << " exclusive: " << exclusive << " cached: " << cached << " exists: " << exists << std::endl;
     pthread_mutex_unlock(&output_lock);
 #endif
     return *frame;
@@ -495,7 +498,8 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
         exit(1);
     }
     pthread_mutex_lock(&output_lock);
-    std::cout << "UNFIX: " << frame.pageId << " isDirty was: " << isDirty << std::endl;
+    const struct PID * pid_output = reinterpret_cast<const struct PID *>(&frame.pageId);
+    std::cout << "UNFIX: " << pid_output->sid << ":" <<pid_output->pid << " isDirty was: " << isDirty << std::endl;
     pthread_mutex_unlock(&output_lock);
     return;
 }
@@ -513,7 +517,7 @@ BufferManager::~BufferManager() {
         if (current->isDirty) {
             //If it is dirty we need to write it to disk
             //Get pid and sid from pageId
-            const struct Pid * pid = reinterpret_cast<const struct Pid *>(&(current->pageId));
+            const struct PID * pid = reinterpret_cast<const struct PID *>(&(current->pageId));
             //calculate the file name
             std::stringstream sstm;
             sstm << pid->sid;

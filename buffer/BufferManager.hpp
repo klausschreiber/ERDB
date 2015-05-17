@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <list>
 #include <pthread.h>
+#include "PID.hpp"
 
 class BufferManager {
 
@@ -15,7 +16,11 @@ public:
     //fixPage call. Used to get a certain Page. If exclusive is given it is locked for writing
     //else only reading is safe!
     BufferFrame& fixPage( const uint64_t pageId, const bool exclusive );
-    
+    BufferFrame& fixPage( const struct PID pid, const bool exclusive )
+    {
+        return fixPage( *(reinterpret_cast<const uint64_t *>(&pid)), exclusive);
+    }
+
     //return a previously fixed Page. Returning a page twice is undefined and might lead to a
     //system failure! If isDirty is set, it is assumed that the page was changed. Else it is
     //assumed untouched

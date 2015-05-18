@@ -117,8 +117,19 @@ bool SPSegment::remove(TID tid) {
 }
 
 Record SPSegment::lookup(TID tid) {
-    Record* r = reinterpret_cast<Record*>(malloc (sizeof(Record)));
-    return std::move(*r);
+    PID pid = {};
+    pid.pid = tid.pid;
+    pid.sid = schema->segment;
+    BufferFrame * frame = &bm.fixPage(pid, true);
+    SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
+    uint32_t recordlength = spage->slot[tid.slot].local.length;
+    char * data = reinterpret_cast<char*>(malloc (recordlength));
+    memcpy(data,
+           spage->data + spage->slot[tid.slot].local.offset,
+           recordlength);
+    Record record(recordlength, data);
+
+    return std::move(record);
 }
 
 bool update(TID tid, const Record& r) {

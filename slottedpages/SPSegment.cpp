@@ -96,16 +96,19 @@ TID SPSegment::insert(const Record& r) {
 }
 
 bool SPSegment::remove(TID tid) {
-    BufferFrame * frame = &bm.fixPage(tid.pid, true);
+    PID pid = {};
+    pid.pid = tid.pid;
+    pid.sid = schema->segment;
+    BufferFrame * frame = &bm.fixPage(pid, true);
     SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
     if (spage->header.slot_count <= tid.slot) {
         //our !?!
-        std::cout << "remove Failed: tid.slot " << tid.slot << "invalid  for slot_count " << spage->header.slot_count
+        std::cout << "remove Failed: tid.slot " << tid.slot << " invalid for slot_count " << spage->header.slot_count
         << "! Aborting!" << std::endl;
         exit(1);
     }
-    if (spage->slot[tid.slot].local.T =! 0) {
-        spage->slot->local.T = 0;
+    if (spage->slot[tid.slot].local.T != T_INVAL) {
+        spage->slot[tid.slot].local.T = T_INVAL;
         bm.unfixPage(*frame, true);
         return true;
     }

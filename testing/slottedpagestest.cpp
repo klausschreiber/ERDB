@@ -49,10 +49,16 @@ int main(int argc, char ** argv) {
     Record *r2 = new Record(512, data2);
     TID tid2 = sps->insert(*r2);
 
+    char * data3 = "my test";
+    Record *r3 = new Record(8, data3);
+    TID tid3 = sps->insert(*r3);
+
     sps->remove(tid2);
 
     std::cout << sps->lookup(tid1).getData() << std::endl;
 
+    sps->update(tid3, *r3);
+    std::cout << sps->lookup(tid3).getData() << std::endl;
 
     delete sm;
     delete bm;

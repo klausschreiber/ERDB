@@ -40,14 +40,14 @@ int main(int argc, char ** argv) {
 
     char * data = "my test data";
     Record *r = new Record(13, data);
-    TID tid = sps->insert(*r);
+    sps->insert(*r);
 
     char * data2 = reinterpret_cast<char*>(malloc(512));
     memset(data2, 'X', 512);
     data2[0] = 'A';
     data2[511] = 'O';
     Record *r2 = new Record(512, data2);
-    sps->insert(*r2);
+    TID tid = sps->insert(*r2);
 
     sps->remove(tid);
 

@@ -14,7 +14,7 @@
 
 
 //#define PRINT_LOCK
-#define PRINT_BASIC
+//#define PRINT_BASIC
 
 //Definition of segment-id and page-id within pageId (externally given)
 //struct Pid {
@@ -48,9 +48,10 @@ BufferManager::BufferManager( const unsigned int pageCount ) {
 
 BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive ) {
     // some flags we set while processing to generate log output later on
+#ifdef PRINT_BASIC
     bool exists = true;
     bool cached = false;
- 
+#endif
     //Test if we got the frame in the buffer
     BufferFrame * frame;
         
@@ -336,7 +337,9 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         }
         else if (rsize != pageSize) {
             //If we could not read the page from the segment file, we create an empty page
+#ifdef PRINT_LOCK
             exists = false;
+#endif
             memset(frame->data, '\0', pageSize);
             frame->isDirty = true;
         }
@@ -398,8 +401,9 @@ BufferFrame& BufferManager::fixPage( const uint64_t pageId, const bool exclusive
         // Step 3: Obtain rwlock. This might block for a while if someone else
         //          currently uses it, which does not matter as we do not hold
         //          any critical locks at this point
-        
+#ifdef PRINT_LOCK 
         cached = true;
+#endif
         frame = pages_it->second;
         //LOCK(frame->latch)
 #ifdef PRINT_LOCK
@@ -497,15 +501,16 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
         std::cout << "could not unlock rwlock! Aborting!" << std::endl;
         exit(1);
     }
+#ifdef PRINT_BASIC
     pthread_mutex_lock(&output_lock);
     const struct PID * pid_output = reinterpret_cast<const struct PID *>(&frame.pageId);
     std::cout << "UNFIX: " << pid_output->sid << ":" <<pid_output->pid << " isDirty was: " << isDirty << std::endl;
     pthread_mutex_unlock(&output_lock);
+#endif
     return;
 }
 
 BufferManager::~BufferManager() {
-    std::cout << "BufferFrame destructor" << std::endl;
     //before exiting we need to write all dirty pages to disk.
     //TODO: Think about it: is it the best way to ignore all locks on BufferFrames and simply write the content (of diry pages) to disk?
     //TODO: Think about it: is it safe not to lock anything within destructor?
@@ -513,7 +518,6 @@ BufferManager::~BufferManager() {
     //write frames to disk
     for (auto it = pages.begin(); it != pages.end(); it++) { 
         BufferFrame * current = it->second;
-        std::cout << "Destructor: clearing page " << current->pageId << std::endl;
         if (current->isDirty) {
             //If it is dirty we need to write it to disk
             //Get pid and sid from pageId
@@ -542,7 +546,6 @@ BufferManager::~BufferManager() {
                 exit(1);
             }
             //at this point the write was successfull
-            std::cout <<  "Destructor: writing page " << current->pageId << " to disk. "  << wsize << " Bytes written" << std::endl;
         }
         //Now as it was written to disk if needed we can securely delete it
         //delete current;
@@ -552,7 +555,6 @@ BufferManager::~BufferManager() {
         //No error checking is done as there is no way out anyways
         close(it->second);
     }
-    std::cout << "Destructor: file Handles closed" << std::endl;
 
     //destroy locks
     int res = pthread_mutex_destroy(&pages_lock);

@@ -210,6 +210,7 @@ bool SPSegment::update(TID tid, const Record& r) {
             std::cout << "left: " << spage->header.data_start - 
                     (spage->header.slot_count) * sizeof(SlottedPage::Slot)  << std::endl;
             std::cout << "r.getLen: " << r.getLen() << std::endl;
+            uint32_t old_len = spage->slot[tid.slot].local.length;
             if( spage->header.data_start - 
                     (spage->header.slot_count) * sizeof(SlottedPage::Slot)<
                     r.getLen()) {
@@ -225,7 +226,7 @@ bool SPSegment::update(TID tid, const Record& r) {
             std::cout << "free space: " << spage->header.free_space << std::endl;
             //update free_space
             spage->header.free_space -= 
-                (r.getLen() - spage->slot[tid.slot].local.length);
+                (r.getLen() - old_len);
             //generate now position and length
             std::cout << "old data (len|off): " << spage->slot[tid.slot].local.length << "|" << spage->slot[tid.slot].local.offset << std::endl;
             spage->slot[tid.slot].local.length = r.getLen();

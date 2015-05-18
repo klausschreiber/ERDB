@@ -3,6 +3,21 @@
 
 #include <stdint.h>
 #include "../buffer/constants.hpp"
+#include "TID.hpp"
+
+//Meaning of Slot:
+// if T == 0xff: local tuple
+//      if S == 0x00: regular tuple
+//      if ? == 0xff: moved from other page to here
+// if T == 0x00: invalid / removed tuple
+// if T == something else: use TID as indirecton
+
+#define T_LOCAL 0xff
+#define T_INVAL 0x00
+#define T_INDIR 0x42
+
+#define S_REGULAR 0x00
+#define S_MOVED 0xff
 
 
 struct SlottedPage {
@@ -15,14 +30,14 @@ struct SlottedPage {
 
     struct Slot {
         struct Local {
-            uint8_t T;
-            uint8_t S;
-            uint32_t offset:24;
-            uint32_t length:24;
+            uint32_t length:24 __attribute__((packed));
+            uint32_t offset:24 __attribute__((packed));
+            uint8_t S:8;
+            uint8_t T:8;
         };
         union {
             struct Local local;
-            uint64_t indirection;
+            struct TID indirection;
         };
     };
 

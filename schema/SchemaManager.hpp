@@ -30,7 +30,8 @@ public:
     int dropSchema(const std::string name);
 
     //update the schema pages count (needs to be updated after insert of data)
-    int incrementPagesCount(const std::string name);
+    //returns the new schema
+    const struct Schema* incrementPagesCount(const std::string name);
 
     const std::list<std::string> listTables();
 

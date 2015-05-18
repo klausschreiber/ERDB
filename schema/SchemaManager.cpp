@@ -67,7 +67,7 @@ int SchemaManager::addSchema(Schema& schema) {
     }
 }
 
-int SchemaManager::incrementPagesCount(const std::string name) {
+const struct Schema* SchemaManager::incrementPagesCount(const std::string name) {
     auto result = schema_map.find(name);
     if (result != schema_map.end()) {
         auto page_res = schema_page_map.find(name);
@@ -84,10 +84,10 @@ int SchemaManager::incrementPagesCount(const std::string name) {
         bufferManager.unfixPage(frame, true);
         //change it in memory
         result->second->page_count++;
-        return 0;
+        return &(schemaFrame->schema);
     }
     else {
-        return -1;
+        return NULL;
     }
 }
 

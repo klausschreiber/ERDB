@@ -85,6 +85,20 @@ TID SPSegment::insert(const Record& r) {
 }
 
 bool SPSegment::remove(TID tid) {
+    BufferFrame * frame = &bm.fixPage(tid.pid, true);
+    SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
+    if (spage->header.slot_count <= tid.slot) {
+        //our !?!
+        std::cout << "remove Failed: tid.slot " << tid.slot << "invalid  for slot_count " << spage->header.slot_count
+        << "! Aborting!" << std::endl;
+        exit(1);
+    }
+    if (spage->slot[tid.slot].local.T =! 0) {
+        spage->slot->local.T = 0;
+        bm.unfixPage(*frame, true);
+        return true;
+    }
+    bm.unfixPage(*frame, false);
     return false;
 }
 

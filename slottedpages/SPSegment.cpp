@@ -120,19 +120,38 @@ Record SPSegment::lookup(TID tid) {
     PID pid = {};
     pid.pid = tid.pid;
     pid.sid = schema->segment;
-    BufferFrame * frame = &bm.fixPage(pid, true);
+    BufferFrame * frame = &bm.fixPage(pid, false);
     SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
-    uint32_t recordlength = spage->slot[tid.slot].local.length;
-    char * data = reinterpret_cast<char*>(malloc (recordlength));
-    memcpy(data,
-           spage->data + spage->slot[tid.slot].local.offset,
-           recordlength);
-    Record record(recordlength, data);
-
+    if (spage->slot[tid.slot].local.T != T_INDIR) {
+        uint32_t recordlength = spage->slot[tid.slot].local.length;
+        char *data = reinterpret_cast<char *>(malloc(recordlength));
+        memcpy(data,
+               spage->data + spage->slot[tid.slot].local.offset,
+               recordlength);
+        bm.unfixPage(*frame, false);
+        Record record(recordlength, data);
+        return std::move(record);
+    }
+    Record record(0, NULL);
     return std::move(record);
 }
 
-bool update(TID tid, const Record& r) {
+bool SPSegment::update(TID tid, const Record& r) {
+    PID pid = {};
+    pid.pid = tid.pid;
+    pid.sid = schema->segment;
+    BufferFrame * frame = &bm.fixPage(pid, true);
+    SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
+    if (spage->slot[tid.slot].local.length >= r.getLen()) {
+        if (spage->slot[tid.slot].local.length > r.getLen()) {
+            spage->slot[tid.slot].local.length = r.getLen();
+        }
+        memcpy(spage->data + spage->slot[tid.slot].local.offset,
+               r.getData(),
+               r.getLen());
+        bm.unfixPage(*frame, true);
+        return true;
+    }
     return false;
 }
 

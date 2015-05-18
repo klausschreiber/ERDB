@@ -12,6 +12,8 @@
 // if T == 0x00: invalid / removed tuple
 // if T == something else: use TID as indirecton
 
+//Note: if an indirection is used, the new tuple on the indirected page should
+//contain the original TID (as first 8 Bytes) to simplyfy scans later on
 #define T_LOCAL 0xff
 #define T_INVAL 0x00
 #define T_INDIR 0x42

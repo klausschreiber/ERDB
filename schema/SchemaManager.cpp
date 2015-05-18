@@ -151,7 +151,7 @@ SchemaManager::SchemaManager( BufferManager & bufferManager )
                 //set the next_segment id if needed
                 if (next_segment <= schema->segment)
                     next_segment = schema->segment + 1;
-                std::cout << "Loadad: \n" << schema->toString() << std::endl;
+//                std::cout << "Loadad: \n" << schema->toString() << std::endl;
             }
             //check if this was the last frame to read
             if( !schemaFrame->header.has_next ) 

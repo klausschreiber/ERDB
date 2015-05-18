@@ -29,6 +29,9 @@ public:
 
 private:
 
+    //init page
+    void init(struct SlottedPage * page);
+
     //compact page
     void compact(struct SlottedPage * page);
 

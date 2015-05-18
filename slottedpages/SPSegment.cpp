@@ -20,13 +20,22 @@ TID SPSegment::insert(const Record& r) {
     BufferFrame * frame = &bm.fixPage(pid, true);
     SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
 
+    //check if the page is uninitialized and do so if needed
+    if(spage->header.data_start == 0) {
+        init(spage);
+    }
+
     //find first page with enough space
-    while( spage->header.free_space - sizeof(SlottedPage::Slot) < r.getLen()) {
+    while( spage->header.free_space < r.getLen() + sizeof(SlottedPage::Slot)) {
         //unfix Page
         bm.unfixPage(*frame, false);
         pid.pid++;
         frame = &bm.fixPage(pid, true);
         spage = reinterpret_cast<SlottedPage *>(frame->getData());
+        //check if the page is uninitialized and do so if needed
+        if(spage->header.data_start == 0) {
+            init(spage);
+        }
     }
 
     //set the page_count of the schema if needed
@@ -38,24 +47,20 @@ TID SPSegment::insert(const Record& r) {
             exit(1);
         }
     }
-
-    //check if the page is uninitialized
-    if(spage->header.data_start == 0) {
-        // this should only happen for page 0 if it has never been written before
-        spage->header.slot_count = 0;
-        spage->header.first_free_slot = 0;
-        //point at element beyond last possible value
-        spage->header.data_start = pageSize - sizeof(SlottedPage::Header);
-        //only header is used
-        spage->header.free_space = pageSize - sizeof(SlottedPage::Header);
-    }
     
     //check if we need to compact page
     if( spage->header.data_start - 
-            spage->header.slot_count * sizeof(SlottedPage::Slot) < r.getLen()) {
+            (spage->header.slot_count) * sizeof(SlottedPage::Slot) <
+            r.getLen() + sizeof(SlottedPage::Slot)) {
         //compact page
         compact(spage);
     }
+    
+    //generate TID to return (where did we store)
+    struct TID tid = {};
+    tid.slot = spage->header.first_free_slot;
+    tid.reserved = 0;
+    tid.pid = pid.pid;
 
     //copy data to page
     uint16_t start_offset = spage->header.data_start - r.getLen();
@@ -85,36 +90,35 @@ TID SPSegment::insert(const Record& r) {
     //update the free space according to added length
     spage->header.free_space -= r.getLen();
     
-    //generate TID to return (where did we store)
-    struct TID tid = {};
-    tid.slot = spage->header.first_free_slot -1;
-    tid.reserved = 0;
-    tid.pid = pid.pid;
     //done, unfix page
     bm.unfixPage(*frame, true);
     return tid;
 }
 
+
 bool SPSegment::remove(TID tid) {
-    PID pid = {};
+    struct PID pid = {};
     pid.pid = tid.pid;
     pid.sid = schema->segment;
     BufferFrame * frame = &bm.fixPage(pid, true);
     SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
     if (spage->header.slot_count <= tid.slot) {
-        //our !?!
-        std::cout << "remove Failed: tid.slot " << tid.slot << " invalid for slot_count " << spage->header.slot_count
-        << "! Aborting!" << std::endl;
+        
+        std::cout << "remove Failed: tid.slot " << tid.slot <<
+            " invalid for slot_count " << spage->header.slot_count << 
+            "! Aborting!" << std::endl;
         exit(1);
     }
     if (spage->slot[tid.slot].local.T != T_INVAL) {
         spage->slot[tid.slot].local.T = T_INVAL;
+        spage->header.free_space += spage->slot[tid.slot].local.length;
         bm.unfixPage(*frame, true);
         return true;
     }
     bm.unfixPage(*frame, false);
     return false;
 }
+
 
 Record SPSegment::lookup(TID tid) {
     PID pid = {};
@@ -155,6 +159,7 @@ bool SPSegment::update(TID tid, const Record& r) {
     return false;
 }
 
+
 SPSegment::SPSegment( BufferManager& bm, SchemaManager& sm, std::string schema_name) 
         : sm(sm), bm(bm) {
     schema = sm.getSchema(schema_name);
@@ -166,6 +171,17 @@ SPSegment::SPSegment( BufferManager& bm, SchemaManager& sm, std::string schema_n
         exit(1);
     }
 }
+
+
+void SPSegment::init(struct SlottedPage * page) {
+    page->header.slot_count = 0;
+    page->header.first_free_slot = 0;
+    //point at element beyond last possible value
+    page->header.data_start = pageSize - sizeof(SlottedPage::Header);
+    //only header is used
+    page->header.free_space = pageSize - sizeof(SlottedPage::Header);
+}
+
 
 void SPSegment::compact(SlottedPage * page) {
     SlottedPage * tmppage =
@@ -200,6 +216,8 @@ void SPSegment::compact(SlottedPage * page) {
             //all other slots are assumed invalid and simply set as invalid
             //all other fileds do not matter in this case :-)
             tmppage->slot[i].local.T = T_INVAL;
+            if ( i < tmppage->header.first_free_slot )
+                tmppage->header.first_free_slot = i;
         }
     }
     //copy tmppage to original page

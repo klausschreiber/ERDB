@@ -11,6 +11,8 @@ TID SPSegment::insert(const Record& r) {
         std::cout << "data to big to fit on single page! Aborting!" << std::endl;
         exit(1);
     }
+
+    std::cout << "insert called with record of size: " << r.getLen() << std::endl;
     
     struct PID pid = {};
     pid.pid = 0;
@@ -30,7 +32,9 @@ TID SPSegment::insert(const Record& r) {
         //unfix Page
         bm.unfixPage(*frame, false);
         pid.pid++;
+        std::cout << pid.pid << std::endl;
         frame = &bm.fixPage(pid, true);
+        std::cout << "alive" << std::endl;
         spage = reinterpret_cast<SlottedPage *>(frame->getData());
         //check if the page is uninitialized and do so if needed
         if(spage->header.data_start == 0) {
@@ -199,9 +203,15 @@ bool SPSegment::update(TID tid, const Record& r) {
             std::cout << "update: same page" << std::endl;
             //fits on page
             //check if we need to compact the page
+            std::cout << "compact precond: " << std::endl;
+            std::cout << "data start: " << spage->header.data_start << std::endl;
+            std::cout << "slot count: " << spage->header.slot_count << std::endl;
+            std::cout << "slot length: " << spage->slot[tid.slot].local.length << std::endl;
+            std::cout << "left: " << spage->header.data_start - 
+                    (spage->header.slot_count) * sizeof(SlottedPage::Slot)  << std::endl;
+            std::cout << "r.getLen: " << r.getLen() << std::endl;
             if( spage->header.data_start - 
-                    (spage->header.slot_count) * sizeof(SlottedPage::Slot) + 
-                    (uint32_t) spage->slot[tid.slot].local.length <
+                    (spage->header.slot_count) * sizeof(SlottedPage::Slot)<
                     r.getLen()) {
                 //set the length of this slot to 0 (so compact works as desired)
                 spage->slot[tid.slot].local.length = 0;
@@ -209,6 +219,10 @@ bool SPSegment::update(TID tid, const Record& r) {
                 std::cout << "update: compact" << std::endl;
                 compact(spage);
             }
+
+            std::cout << "compact postcond: " << std::endl;
+            std::cout << "data start: " << spage->header.data_start << std::endl;
+            std::cout << "free space: " << spage->header.free_space << std::endl;
             //update free_space
             spage->header.free_space -= 
                 (r.getLen() - spage->slot[tid.slot].local.length);
@@ -244,6 +258,7 @@ bool SPSegment::update(TID tid, const Record& r) {
             bm.unfixPage(*frame, false);
             TID indir_tid = insert(indir_r);
             frame = &bm.fixPage(pid, true);
+            spage = reinterpret_cast<SlottedPage *>(frame->getData());
             //load the page it is stored on
             std::cout << "still alive" << std::endl;
             PID indir_pid = {};
@@ -291,8 +306,6 @@ bool SPSegment::update(TID tid, const Record& r) {
             if( spage->header.data_start - 
                     (spage->header.slot_count) * sizeof(SlottedPage::Slot) <
                     r.getLen()) {
-                //set the length of this slot to 0 (so compact works as desired)
-                spage->slot[tid.slot].local.length = 0;
                 //compact page
                 compact(spage);
             }
@@ -307,6 +320,8 @@ bool SPSegment::update(TID tid, const Record& r) {
             memcpy(spage->data + spage->slot[tid.slot].local.offset,
                     r.getData(),
                     r.getLen());
+            //update free_space
+            spage->header.free_space -= spage->slot[tid.slot].local.length;
             bm.unfixPage(*frame, true);
             //test
             std::cout << "end of removing indirection" << std::endl;
@@ -318,6 +333,10 @@ bool SPSegment::update(TID tid, const Record& r) {
         else if (indir_spage->slot[indir_tid.slot].local.length >=
                 r.getLen() + sizeof(TID)) {
             //fits in original indirected slot
+            //update free_space
+            indir_spage->header.free_space += 
+                (spage->slot[indir_tid.slot].local.length - r.getLen() +
+                 sizeof(TID));
             //set new slot length
             indir_spage->slot[indir_tid.slot].local.length =
                 r.getLen() + sizeof(TID);
@@ -337,6 +356,10 @@ bool SPSegment::update(TID tid, const Record& r) {
             //fits on original indirected page
             //we do not touch the original page
             bm.unfixPage(*frame, false);
+            //update free_space
+            indir_spage->header.free_space -= 
+                (r.getLen() + sizeof(TID) -
+                 spage->slot[indir_tid.slot].local.length);
             //check if we need to compact the indir_page
             if( indir_spage->header.data_start - 
                     (indir_spage->header.slot_count) * sizeof(SlottedPage::Slot) <
@@ -346,7 +369,7 @@ bool SPSegment::update(TID tid, const Record& r) {
                 //compact page
                 compact(spage);
             }
-            //generate now position and length
+            //generate new position and length
             indir_spage->slot[indir_tid.slot].local.length = 
                 r.getLen() + sizeof(TID);
             indir_spage->slot[indir_tid.slot].local.offset =

@@ -12,6 +12,13 @@
 // if T == 0x00: invalid / removed tuple
 // if T == something else: use TID as indirecton
 
+#define T_LOCAL 0xff
+#define T_INVAL 0x00
+#define T_INDIR 0x42
+
+#define S_REGULAR 0x00
+#define S_MOVED 0xff
+
 
 struct SlottedPage {
     struct Header {
@@ -23,10 +30,10 @@ struct SlottedPage {
 
     struct Slot {
         struct Local {
-            uint32_t length:24;
-            uint32_t offset:24;
-            uint8_t S;
-            uint8_t T;
+            uint32_t length:24 __attribute__((packed));
+            uint32_t offset:24 __attribute__((packed));
+            uint8_t S:8;
+            uint8_t T:8;
         };
         union {
             struct Local local;

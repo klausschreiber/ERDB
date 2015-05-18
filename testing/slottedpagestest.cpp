@@ -2,9 +2,17 @@
 #include <iostream>
 #include "../schema/SchemaManager.hpp"
 #include "../slottedpages/SPSegment.hpp"
+#include "../buffer/PID.hpp"
 
 int main(int argc, char ** argv) {
     std::cout << "Hello :-)" << std::endl;
+
+    std::cout << "slottedPage: " << sizeof(SlottedPage) << std::endl;
+    std::cout << "Header: " << sizeof(SlottedPage::Header) << std::endl;
+    std::cout << "Slot: " << sizeof(SlottedPage::Slot) << std::endl;
+    std::cout << "TID: " << sizeof(TID) << std::endl;
+    std::cout << "Local: " << sizeof(SlottedPage::Slot::Local) << std::endl;
+    std::cout << "PID: " << sizeof(PID) << std::endl;
 
     BufferManager* bm = new BufferManager(20);
     SchemaManager* sm = new SchemaManager(*bm);
@@ -33,6 +41,13 @@ int main(int argc, char ** argv) {
     char * data = "my test data";
     Record *r = new Record(13, data);
     sps->insert(*r);
+
+    char * data2 = reinterpret_cast<char*>(malloc(512));
+    memset(data2, 'X', 512);
+    data2[0] = 'A';
+    data2[511] = 'O';
+    Record *r2 = new Record(512, data2);
+    sps->insert(*r2);
 
 
     delete sm;

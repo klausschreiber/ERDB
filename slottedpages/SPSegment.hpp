@@ -7,6 +7,7 @@
 #include "../schema/SchemaManager.hpp"
 #include "Record.hpp"
 #include "TID.hpp"
+#include "SlottedPage.hpp"
 
 class SPSegment {
 public:
@@ -27,6 +28,9 @@ public:
     SPSegment ( BufferManager& bm, SchemaManager& sm, std::string schema_name);
 
 private:
+
+    //compact page
+    void compact(struct SlottedPage * page);
 
     //the used schema
     const struct Schema * schema;

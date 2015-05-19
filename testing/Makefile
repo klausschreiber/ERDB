@@ -1,6 +1,6 @@
 include ../Makefile.in
 
-OBJS = buffertest.o schematest.o slottedpagestest.o slottedTest.o
+OBJS = buffertest.o schematest.o slottedpagestest.o slottedtest.o
 
 all: $(OBJS)
 

@@ -50,15 +50,35 @@ int main(int argc, char** argv) {
    const unsigned pageSize = atoi(argv[1]);
 
    // Bookkeeping
-   unordered_map<TID, unsigned> values; // TID -> testData entry
+   unordered_map<uint64_t, unsigned> values; // TID -> testData entry
    unordered_map<unsigned, unsigned> usage; // pageID -> bytes used within this page
 
    // Setting everything
    BufferManager bm(100);
    SchemaManager sm(bm);
    // TODO ...
-   SPSegment& sp = new SPSegment(bm, sm, "test-table");
-   Random64 rnd;
+    
+   int size = sizeof(struct Schema) + 2*sizeof(struct Schema::Attribute);
+    struct Schema * schema = reinterpret_cast<struct Schema *>(malloc(size));
+    schema->attr_count = 2;
+    schema->primary_key_index[0] = 0;
+    schema->primary_key_index[1] = 5;
+    schema->primary_key_index[2] = 5;
+    schema->primary_key_index[3] = 5;
+    schema->primary_key_index[4] = 5;
+    strncpy(schema->name, "test-table", 11);
+    schema->attributes[0].type = Schema::Attribute::Type::Integer;
+    strncpy(schema->attributes[0].name, "id", 3);
+    schema->attributes[0].notNull = true;
+    schema->attributes[1].type = Schema::Attribute::Type::Varchar;
+    schema->attributes[1].length = 20;
+    strncpy(schema->attributes[1].name, "name", 5);
+    schema->attributes[1].notNull = true;
+    
+    sm.addSchema(*schema);
+
+    SPSegment& sp = *(new SPSegment(bm, sm, "test-table"));
+    Random64 rnd;
 
    // Insert some records
    for (unsigned i=0; i<maxInserts; ++i) {
@@ -79,8 +99,8 @@ int main(int argc, char** argv) {
 
       // Insert record
       TID tid = sp.insert(Record(s.size(), s.c_str()));
-      assert(values.find(tid)==values.end()); // TIDs should not be overwritten
-      values[tid]=r;
+      assert(values.find(*reinterpret_cast<uint64_t*>(&tid))==values.end()); // TIDs should not be overwritten
+      values[*reinterpret_cast<uint64_t*>(&tid)]=r;
       unsigned pageId = extractPage(tid); // extract the pageId from the TID
       assert(pageId < initialSize); // pageId should be within [0, initialSize)
       usage[pageId]+=s.size();
@@ -92,7 +112,7 @@ int main(int argc, char** argv) {
       bool del = rnd.next()%10 == 0;
 
       // Select victim
-      TID tid = values.begin()->first;
+      TID tid = *reinterpret_cast<const TID*>(&values.begin()->first);
       unsigned pageId = extractPage(tid);
       const std::string& value = testData[(values.begin()->second)%testData.size()];
       unsigned len = value.size();
@@ -104,7 +124,7 @@ int main(int argc, char** argv) {
 
       if (del) { // do delete
          assert(sp.remove(tid));
-         values.erase(tid);
+         values.erase(*reinterpret_cast<uint64_t*>(&tid));
          usage[pageId]-=len;
       }
    }
@@ -112,7 +132,7 @@ int main(int argc, char** argv) {
    // Update some values ('usage' counter invalid from here on)
    for (unsigned i=0; i<maxUpdates; ++i) {
       // Select victim
-      TID tid = values.begin()->first;
+      TID tid = *reinterpret_cast<const TID*>(&values.begin()->first);
 
       // Select new string/record
       uint64_t r = rnd.next()%testData.size();
@@ -120,12 +140,12 @@ int main(int argc, char** argv) {
 
       // Replace old with new value
       sp.update(tid, Record(s.size(), s.c_str()));
-      values[tid]=r;
+      values[*reinterpret_cast<uint64_t*>(&tid)]=r;
    }
 
    // Lookups
    for (auto p : values) {
-      TID tid = p.first;
+      TID tid = *reinterpret_cast<const TID*>(&p.first);
       const std::string& value = testData[p.second];
       unsigned len = value.size();
       Record rec = sp.lookup(tid);

@@ -12,7 +12,7 @@ TID SPSegment::insert(const Record& r) {
         exit(1);
     }
 
-    std::cout << "insert called with record of size: " << r.getLen() << std::endl;
+//    std::cout << "insert called with record of size: " << r.getLen() << std::endl;
     
     struct PID pid = {};
     pid.pid = 0;
@@ -34,7 +34,7 @@ TID SPSegment::insert(const Record& r) {
         pid.pid++;
         std::cout << pid.pid << std::endl;
         frame = &bm.fixPage(pid, true);
-        std::cout << "alive" << std::endl;
+//        std::cout << "alive" << std::endl;
         spage = reinterpret_cast<SlottedPage *>(frame->getData());
         //check if the page is uninitialized and do so if needed
         if(spage->header.data_start == 0) {
@@ -179,12 +179,12 @@ bool SPSegment::update(TID tid, const Record& r) {
 
     //distinguish: local vs indirected tuple
     if (spage->slot[tid.slot].local.T == T_LOCAL) {
-        std::cout << "update: local slot" << std::endl;
+//       std::cout << "update: local slot" << std::endl;
         //local slot
         //distinguish: does it fit in slot / on page / not
         if (spage->slot[tid.slot].local.length >= r.getLen()) {
             //fits in slot
-            std::cout << "update: same area" << std::endl;
+//            std::cout << "update: same area" << std::endl;
             //update free_space
             spage->header.free_space += 
                 (spage->slot[tid.slot].local.length - r.getLen());
@@ -200,16 +200,16 @@ bool SPSegment::update(TID tid, const Record& r) {
         else if (spage->header.free_space + 
                 (uint32_t) spage->slot[tid.slot].local.length
                 >= r.getLen()) {
-            std::cout << "update: same page" << std::endl;
+//            std::cout << "update: same page" << std::endl;
             //fits on page
             //check if we need to compact the page
-            std::cout << "compact precond: " << std::endl;
-            std::cout << "data start: " << spage->header.data_start << std::endl;
-            std::cout << "slot count: " << spage->header.slot_count << std::endl;
-            std::cout << "slot length: " << spage->slot[tid.slot].local.length << std::endl;
-            std::cout << "left: " << spage->header.data_start - 
-                    (spage->header.slot_count) * sizeof(SlottedPage::Slot)  << std::endl;
-            std::cout << "r.getLen: " << r.getLen() << std::endl;
+//            std::cout << "compact precond: " << std::endl;
+//            std::cout << "data start: " << spage->header.data_start << std::endl;
+//            std::cout << "slot count: " << spage->header.slot_count << std::endl;
+//            std::cout << "slot length: " << spage->slot[tid.slot].local.length << std::endl;
+//            std::cout << "left: " << spage->header.data_start - 
+//                    (spage->header.slot_count) * sizeof(SlottedPage::Slot)  << std::endl;
+//            std::cout << "r.getLen: " << r.getLen() << std::endl;
             uint32_t old_len = spage->slot[tid.slot].local.length;
             if( spage->header.data_start - 
                     (spage->header.slot_count) * sizeof(SlottedPage::Slot)<
@@ -221,18 +221,18 @@ bool SPSegment::update(TID tid, const Record& r) {
                 compact(spage);
             }
 
-            std::cout << "compact postcond: " << std::endl;
-            std::cout << "data start: " << spage->header.data_start << std::endl;
-            std::cout << "free space: " << spage->header.free_space << std::endl;
+//            std::cout << "compact postcond: " << std::endl;
+//            std::cout << "data start: " << spage->header.data_start << std::endl;
+//            std::cout << "free space: " << spage->header.free_space << std::endl;
             //update free_space
             spage->header.free_space -= 
                 (r.getLen() - old_len);
             //generate now position and length
-            std::cout << "old data (len|off): " << spage->slot[tid.slot].local.length << "|" << spage->slot[tid.slot].local.offset << std::endl;
+//            std::cout << "old data (len|off): " << spage->slot[tid.slot].local.length << "|" << spage->slot[tid.slot].local.offset << std::endl;
             spage->slot[tid.slot].local.length = r.getLen();
             spage->slot[tid.slot].local.offset =
                 spage->header.data_start - r.getLen();
-            std::cout << "new data (len|off): " << spage->slot[tid.slot].local.length << "|" << spage->slot[tid.slot].local.offset << std::endl;
+//            std::cout << "new data (len|off): " << spage->slot[tid.slot].local.length << "|" << spage->slot[tid.slot].local.offset << std::endl;
             //copy the data onty the page
             memcpy(spage->data + spage->slot[tid.slot].local.offset,
                     r.getData(),
@@ -243,7 +243,7 @@ bool SPSegment::update(TID tid, const Record& r) {
         else {
             //does not fit -> introduce indirection
             //add the original tid in front of the Record (as new record)
-            std::cout << "update: introducing indirection" << std::endl;
+//            std::cout << "update: introducing indirection" << std::endl;
             char * indir_data = reinterpret_cast<char*>(
                     malloc(r.getLen() + sizeof(TID)));
             memcpy(indir_data,
@@ -254,14 +254,14 @@ bool SPSegment::update(TID tid, const Record& r) {
                     r.getLen());
             Record indir_r(r.getLen() + sizeof(TID), indir_data);
             free(indir_data);
-            std::cout << "free" << std::endl;
+//            std::cout << "free" << std::endl;
             //insert this record therefore we need to release the page first
             bm.unfixPage(*frame, false);
             TID indir_tid = insert(indir_r);
             frame = &bm.fixPage(pid, true);
             spage = reinterpret_cast<SlottedPage *>(frame->getData());
             //load the page it is stored on
-            std::cout << "still alive" << std::endl;
+//            std::cout << "still alive" << std::endl;
             PID indir_pid = {};
             indir_pid.pid = indir_tid.pid;
             indir_pid.sid = schema->segment;
@@ -278,12 +278,12 @@ bool SPSegment::update(TID tid, const Record& r) {
             //unfix the pages
             bm.unfixPage(*frame, true);
             bm.unfixPage(*indir_frame, true);
-            std::cout << "survived update" << std::endl;
+//            std::cout << "survived update" << std::endl;
             return true;
         }
     }
     else {
-        std::cout << "update: indirected slot" << std::endl;
+//        std::cout << "update: indirected slot" << std::endl;
         //indirected slot
 
         TID indir_tid = spage->slot[tid.slot].indirection;
@@ -298,7 +298,7 @@ bool SPSegment::update(TID tid, const Record& r) {
         //distinguish: does it fit on this page / in indirected slot /
         //on indirected page / not
         if ( spage->header.free_space >= r.getLen()) {
-            std::cout << "update: removing indirection" << std::endl;
+//            std::cout << "update: removing indirection" << std::endl;
             //fits on this page -> remove indirection
             //unfix indirection page and remove entry
             bm.unfixPage(*indir_frame, false);
@@ -324,11 +324,6 @@ bool SPSegment::update(TID tid, const Record& r) {
             //update free_space
             spage->header.free_space -= spage->slot[tid.slot].local.length;
             bm.unfixPage(*frame, true);
-            //test
-            std::cout << "end of removing indirection" << std::endl;
-            char * test = (char*) malloc(100);
-            free(test);
-            std::cout << "I survived a malloc :-)" << std::endl;
             return true;
         }
         else if (indir_spage->slot[indir_tid.slot].local.length >=
@@ -388,7 +383,7 @@ bool SPSegment::update(TID tid, const Record& r) {
             return false;
         }
         else {
-            std::cout << "update: changing indirection" << std::endl;
+//            std::cout << "update: changing indirection" << std::endl;
             //does not fit -> select new page for indirection
             //close indirecton page and remove entry
             bm.unfixPage(*indir_frame, false);

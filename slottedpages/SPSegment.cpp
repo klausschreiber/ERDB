@@ -32,7 +32,7 @@ TID SPSegment::insert(const Record& r) {
         //unfix Page
         bm.unfixPage(*frame, false);
         pid.pid++;
-        std::cout << pid.pid << std::endl;
+//        std::cout << pid.pid << std::endl;
         frame = &bm.fixPage(pid, true);
 //        std::cout << "alive" << std::endl;
         spage = reinterpret_cast<SlottedPage *>(frame->getData());
@@ -90,7 +90,12 @@ TID SPSegment::insert(const Record& r) {
     while ( spage->header.first_free_slot != spage->header.slot_count && 
             spage->slot[spage->header.first_free_slot].local.T != T_INVAL )
         spage->header.first_free_slot++;
-    
+    if (spage->slot[spage->header.first_free_slot].local.T != T_INVAL) {
+        std::cout << "Aborting due to first_free_slot invalidation" << std::endl;
+        std::cout << spage->header.first_free_slot << " | "  << spage->header.slot_count << std::endl;
+        exit(1);
+    }
+
     //update the free space according to added length
     spage->header.free_space -= r.getLen();
     

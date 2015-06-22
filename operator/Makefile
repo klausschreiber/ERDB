@@ -1,10 +1,11 @@
 include ../Makefile.in
 
-OBJS = buffertest.o schematest.o slottedpagestest.o slottedtest.o operatortest.o
+OBJS = Register.o TableScan.o
 
 all: $(OBJS)
 
-%.o: %.cpp
+
+%.o: %.cpp %.hpp
 	$(CXX) -c $(CFLAGS) -o $@ $<
 
 clean:

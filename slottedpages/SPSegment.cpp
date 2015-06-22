@@ -438,6 +438,32 @@ SPSegment::SPSegment( BufferManager& bm, SchemaManager& sm, std::string schema_n
     }
 }
 
+std::vector<TID> SPSegment::getTIDs() {
+    std::vector<TID> result;
+    //for all pages
+    std::cout << "scanning pages for tids" << std::endl;
+    for( unsigned int i = 0; i<=schema->page_count; i++) {
+        std::cout << "scanning page: " << i << std::endl;
+        PID pid = {};
+        pid.pid = i;
+        pid.sid = schema->segment;
+        BufferFrame * frame = &bm.fixPage(pid, false);
+        SlottedPage * spage = reinterpret_cast<SlottedPage *>(frame->getData());
+        for (unsigned int j = 0; j < spage->header.slot_count; j++) {
+            std::cout << "scanning slot: " << j << std::endl;
+            if ( (spage->slot[j].local.T == T_LOCAL && spage->slot[j].local.S == S_REGULAR) || (spage->slot[j].local.T == T_INDIR)) {
+                TID tid = {};
+                tid.slot = j;
+                tid.pid = i;
+                tid.reserved = 0;
+                result.push_back(tid);
+            }
+        }   
+    }
+    std::cout << "result has " << result.size() << " elements" << std::endl;
+    return result;     
+}
+
 
 void SPSegment::init(struct SlottedPage * page) {
     page->header.slot_count = 0;

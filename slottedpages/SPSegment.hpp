@@ -2,6 +2,7 @@
 #define SPSEGMENT_HPP
 
 #include <string>
+#include <vector>
 
 #include "../schema/Schema.hpp"
 #include "../schema/SchemaManager.hpp"
@@ -26,6 +27,8 @@ public:
     //constructor. Needs a SchemaManager to work with the schema and the name
     //of the schema to handle
     SPSegment ( BufferManager& bm, SchemaManager& sm, std::string schema_name);
+
+    std::vector<TID> getTIDs();
 
 private:
 

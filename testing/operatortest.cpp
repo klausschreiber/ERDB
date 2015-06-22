@@ -1,5 +1,6 @@
 #include "../operator/Register.hpp"
 #include "../operator/TableScan.hpp"
+#include "../operator/Print.hpp"
 #include <iostream>
 
 int main( int argc, char** argv){
@@ -74,12 +75,20 @@ int main( int argc, char** argv){
 
     //add some data
 
-    char* strings[5] = {"test1", "test2", "test very long", "short", "blork"};
-    struct TableScan::TestSchema row = {};        
+    char* firstname[5] = {"Hans", "Peter", "Dieter", "Moritz", "Max"};
+    char* secondname[5] = {"Maier", "Mueller", "Huber", "Schmidt", "Gruber"};
+    int age[5] = {17, 25, 17, 40, 17};
+    int favorite[5] = { 7, 7, 42, 42, 9000};
+    struct TableScan::TestSchema row = {};
 
     for( int i = 0 ; i<5; i++) {
         row.id = i;
-        memcpy(row.name, strings[i], strlen(strings[i]));
+        memset(row.firstname, 0, 20);
+        memset(row.secondname, 0, 20);
+        memcpy(row.firstname, firstname[i], strlen(firstname[i]));
+        memcpy(row.secondname, secondname[i], strlen(secondname[i]));
+        row.age = age[i];
+        row.favorite = favorite[i];
         Record *r = new Record(sizeof(struct TableScan::TestSchema), (char *) &row);
         sps->insert(*r);
     }
@@ -104,7 +113,20 @@ int main( int argc, char** argv){
                 std::cout << "String: " << (*it)->getString() << std::endl;
             }   
         }
-    }    
+    }
+
+    // testing Print
+    
+    std::cout << "Testing Print operator..." << std::endl;
+
+    ts.close();
+
+    Print p(ts ,std::cout);
+    p.open();
+    while(p.next())
+        continue;
+    
+    std::cout << "Print testing done" << std::endl;
 
     delete (sps);
     delete (sm);

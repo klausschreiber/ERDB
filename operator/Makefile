@@ -1,6 +1,6 @@
 include ../Makefile.in
 
-OBJS = Register.o TableScan.o
+OBJS = Register.o TableScan.o Print.o
 
 all: $(OBJS)
 

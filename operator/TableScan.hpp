@@ -6,11 +6,14 @@
 
 
 //for now it is hardcoded to use TestSchema as schema. Of course this should be implemented as a template later on (to be able to work with different table schemas)
-class TableScan : Operator {
+class TableScan : public Operator {
 public:
     struct TestSchema {
         int id;
-        char name[20];
+        char firstname[20];
+        char secondname[20];
+        int age;
+        int favorite;
     };
     TableScan( SPSegment &spsegment);
     virtual void open();

@@ -30,7 +30,7 @@ bool Print::next() {
     return true;
 }
 
-std::vector<Register*> Print::getOutput() {
+std::vector<std::shared_ptr<Register>> Print::getOutput() {
     return registers;
 }
 

@@ -3,6 +3,7 @@
 
 #include "cstring"
 #include <iostream>
+#include <functional>
 
 class Register {
 public:
@@ -10,6 +11,9 @@ public:
 
     //constructor
     Register();
+    //destructor
+    ~Register();
+
 
     void setInteger( const int value);
     int getInteger();
@@ -23,10 +27,10 @@ public:
 
     //not they only return a useful result if type matches.
     //if not it is performed anyways, but the result will not be as desired
-    bool operator< (Register &b);
-    bool operator== (Register &b);
+    bool operator< (Register b) const;
+    bool operator== (Register b) const;
 
-    char * hash();
+    std::size_t hash() const;
 
 private:
 
@@ -39,5 +43,16 @@ private:
         char str_val[Register::length];
     } val;
 };
+
+//for convenience: overload the std::hash to use the Register.hash function
+
+namespace std {
+    template <>
+    struct hash<Register> {
+        std::size_t operator()(const Register& k) const {
+            return k.hash();
+        }
+    };
+}
 
 #endif

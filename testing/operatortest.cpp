@@ -1,7 +1,11 @@
 #include "../operator/Register.hpp"
 #include "../operator/TableScan.hpp"
 #include "../operator/Print.hpp"
+#include "../operator/Projection.hpp"
+#include "../operator/Selection.hpp"
+#include "../operator/HashJoin.hpp"
 #include <iostream>
+#include <memory>
 
 int main( int argc, char** argv){
     std::cout << "OPERATOR TEST RUN" << std::endl;
@@ -103,7 +107,7 @@ int main( int argc, char** argv){
     ts.open();
     
     while(ts.next()) {
-        std::vector<Register*> regs = ts.getOutput();
+        std::vector<std::shared_ptr<Register>> regs = ts.getOutput();
         std::cout << "got output:" <<std::endl;
         for(auto it = regs.begin(); it != regs.end(); it++) {
             if ((*it)->getType() == Register::Integer) {
@@ -125,8 +129,63 @@ int main( int argc, char** argv){
     p.open();
     while(p.next())
         continue;
-    
+
+    p.close();
+
     std::cout << "Print testing done" << std::endl;
+    
+    //testing projection
+    std::cout << "Testing projection" << std::endl;
+
+    std::vector<int> project;
+    project.push_back(0);
+    project.push_back(3);
+
+    Projection proj(p, project);
+    Print p2(proj, std::cout);
+
+    p2.open();
+
+    while(p2.next())
+        continue;
+
+    p2.close();
+
+    std::cout << "Projection testing done" << std::endl;
+
+    //testing selection
+    std::cout << "Testing selection" << std::endl;
+
+    Selection sel(p2, 1, 17);
+    Print p3(sel, std::cout);
+
+    p3.open();
+
+    while(p3.next())
+        continue;
+
+    p3.close();
+
+    
+    std::cout << "Selection test done" << std::endl;
+    
+    //hash join test
+    
+    std::cout << "Testing hash join" << std::endl;
+
+    TableScan ts2(*sps);
+
+    HashJoin h(p3, ts2, 1, 3);
+
+    Print p4(h, std::cout);
+
+    p4.open();
+
+    while(p4.next())
+        continue;
+
+    p4.close();
+
 
     delete (sps);
     delete (sm);

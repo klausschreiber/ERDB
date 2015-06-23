@@ -1,16 +1,17 @@
-#ifndef PRINT_HPP
-#define PRINT_HPP
+#ifndef SELECTION_HPP
+#define SELECTION_HPP
 
 #include "Operator.hpp"
-#include <iostream>
 #include <memory>
 
 //print operator. It prints its input to stdout and forwards it.
 //thus it is safe to use its getOutput() which simply passe th eretreived data on to the next levl
-class Print : public Operator {
+class Selection : public Operator {
 public:
 
-    Print( Operator &in_op, std::ostream &ostr);
+    Selection( Operator &in_op, unsigned int reg_id, char * value);
+    Selection( Operator &in_op, unsigned int reg_id, int value);
+    Selection( Operator &in_op, unsigned int reg_id, Register value);
 
     virtual void open();
     virtual bool next();
@@ -21,7 +22,8 @@ private:
 
     std::vector<std::shared_ptr<Register>> registers;
     Operator &input;
-    std::ostream &ostream;
+    unsigned int id;
+    Register compare;
 };
 
 #endif

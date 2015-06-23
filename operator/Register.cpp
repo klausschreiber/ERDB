@@ -1,5 +1,7 @@
 #include "Register.hpp"
 #include <cstring>
+#include <iostream>
+#include <string>
 
 Register::Register() {
     //just to be shure the getters will return 0 terminated strings from the very fist time
@@ -7,12 +9,16 @@ Register::Register() {
     type = Integer;
 }
 
+Register::~Register() {
+//    std::cout << "Register constructor called" << std::endl;
+}
+
 void Register::setInteger( const int value) {
     type = Integer;
     val.int_val = value;
 }
 
-int Register::getInteger() {
+int Register::getInteger(){
     //no check done, as this will always work
     return val.int_val;
 }
@@ -34,7 +40,7 @@ Register::Type Register::getType() {
     return type;
 }
 
-bool Register::operator< (Register &b) {
+bool Register::operator< (Register b) const {
     switch (type){
         case Integer:
             return val.int_val < b.getInteger();
@@ -45,7 +51,7 @@ bool Register::operator< (Register &b) {
     }
 }
 
-bool Register::operator== (Register &b) {
+bool Register::operator== (Register b) const {
     switch (type){
         case Integer:
             return val.int_val == b.getInteger();
@@ -56,9 +62,18 @@ bool Register::operator== (Register &b) {
     }
 }
 
-char * Register::hash() {
-    //TODO: implement real hash!
-    return val.str_val;
+std::size_t Register::hash() const {
+    //TODO: implement better hash!
+    switch (type) {
+        case Integer:
+            std::hash<int> int_hash;
+            return int_hash(val.int_val);
+        case String:
+            std::hash<const char*> char_hash;
+            return char_hash(val.str_val);
+        default:
+            return 0;
+    }
 }
 
 

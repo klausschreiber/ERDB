@@ -63,7 +63,6 @@ bool Register::operator== (Register b) const {
 }
 
 std::size_t Register::hash() const {
-    //TODO: implement better hash!
     switch (type) {
         case Integer:
             std::hash<int> int_hash;

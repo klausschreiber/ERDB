@@ -4,19 +4,16 @@
 #include "Operator.hpp"
 #include "../slottedpages/SPSegment.hpp"
 #include <memory>
+#include <map>
 
 
-//for now it is hardcoded to use TestSchema as schema. Of course this should be implemented as a template later on (to be able to work with different table schemas)
 class TableScan : public Operator {
 public:
-    struct TestSchema {
-        int id;
-        char firstname[20];
-        char secondname[20];
-        int age;
-        int favorite;
-    };
-    TableScan( SPSegment &spsegment);
+    enum Type {Integer, String};
+;
+    //initialize table scan using a SPSegment and a map representing the schema.
+    //This can be interpreted as: (first, second) -> at offset <first> there is a value of type second, where second is either an int or a char[20].
+    TableScan( SPSegment &spsegment, std::map<int, TableScan::Type> &data_schema);
     virtual void open();
     virtual bool next();
     virtual std::vector<std::shared_ptr<Register>> getOutput();
@@ -26,6 +23,7 @@ private:
     std::vector<TID> ids;
     unsigned int current;
     std::vector<std::shared_ptr<Register>> registers;
+    std::map<int,Type> schema;
 
 };
 

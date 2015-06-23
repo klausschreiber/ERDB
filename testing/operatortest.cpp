@@ -54,7 +54,9 @@ int main( int argc, char** argv){
     SchemaManager* sm = new SchemaManager(*bm);
     
 
-    //add the schema for all further tests
+    //add the schema for all further tests.
+    //This is not the real schema used, as only its name will be used to reference it
+    //and identify the segment. The other values are stored elsewere
     int size = sizeof(struct Schema) + 2*sizeof(struct Schema::Attribute);
     struct Schema * schema = reinterpret_cast<struct Schema *>(malloc(size));
     schema->attr_count = 2;
@@ -77,13 +79,21 @@ int main( int argc, char** argv){
 
     SPSegment* sps = new SPSegment(*bm, *sm, "operator-table");
 
-    //add some data
+    //add some data using a struct for convenience
+
+    struct TestSchema {
+        int id;
+        char firstname[20];
+        char secondname[20];
+        int age;
+        int favorite;
+    };
 
     char* firstname[5] = {"Hans", "Peter", "Dieter", "Moritz", "Max"};
     char* secondname[5] = {"Maier", "Mueller", "Huber", "Schmidt", "Gruber"};
     int age[5] = {17, 25, 17, 40, 17};
     int favorite[5] = { 7, 7, 42, 42, 9000};
-    struct TableScan::TestSchema row = {};
+    struct TestSchema row = {};
 
     for( int i = 0 ; i<5; i++) {
         row.id = i;
@@ -93,15 +103,24 @@ int main( int argc, char** argv){
         memcpy(row.secondname, secondname[i], strlen(secondname[i]));
         row.age = age[i];
         row.favorite = favorite[i];
-        Record *r = new Record(sizeof(struct TableScan::TestSchema), (char *) &row);
+        Record *r = new Record(sizeof(struct TestSchema), (char *) &row);
         sps->insert(*r);
     }
+
+    //create the corresponding schema map (for the table scan)
+    
+    std::map<int, TableScan::Type> tableschema;
+    tableschema.insert(std::make_pair(0, TableScan::Integer));
+    tableschema.insert(std::make_pair(4, TableScan::String));
+    tableschema.insert(std::make_pair(24, TableScan::String));
+    tableschema.insert(std::make_pair(44, TableScan::Integer));
+    tableschema.insert(std::make_pair(48, TableScan::Integer));
 
     //initiate a table scan
    
     std::cout << "initializing table scan... " << std::endl;
  
-    TableScan ts(*sps);
+    TableScan ts(*sps, tableschema);
 
     std::cout << "open table scan" << std::endl;
     ts.open();
@@ -173,7 +192,7 @@ int main( int argc, char** argv){
     
     std::cout << "Testing hash join" << std::endl;
 
-    TableScan ts2(*sps);
+    TableScan ts2(*sps, tableschema);
 
     HashJoin h(p3, ts2, 1, 3);
 

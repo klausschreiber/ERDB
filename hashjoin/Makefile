@@ -1,6 +1,6 @@
 include ../Makefile.in
 
-OBJS = hashjoin.o hashjointest.o
+OBJS = hashjoin.o
 
 all: $(OBJS)
 

@@ -40,8 +40,8 @@ slotted-test: schema buffer slottedpages testing
 operator-test: schema buffer slottedpages operator testing
 	$(LD) $(LDFLAGS) -o operator-test ./testing/operatortest.o ./operator/HashJoin.o ./operator/Selection.o ./operator/Projection.o ./operator/Print.o ./operator/Register.o ./operator/TableScan.o ./slottedpages/SPSegment.o ./slottedpages/Record.o ./schema/Schema.o ./schema/SchemaManager.o ./buffer/BufferManager.o ./buffer/BufferFrame.o
 
-hashjoin-test: hashjoin
-	$(LD) $(LDFLAGS) -ltbb -o hashjoin-test ./hashjoin/hashjoin.o ./hashjoin/hashjointest.o
+hashjoin-test: hashjoin testing
+	$(LD) $(LDFLAGS) -ltbb -o hashjoin-test ./hashjoin/hashjoin.o ./testing/hashjointest.o
 
 clean:
 	$(RM) -rf hashjoin-test buffer-test schema-test slottedpages-test slotted-test operator-test 0 1 2 3 4 5 6 7 8 9
